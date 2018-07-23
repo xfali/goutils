@@ -8,7 +8,7 @@
  * Description: 
  */
 
-package goutils
+package atomic
 
 import "sync/atomic"
 

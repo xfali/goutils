@@ -8,7 +8,7 @@
  * Description: 
  */
 
-package goutils
+package container
 
 import (
     "container/list"
