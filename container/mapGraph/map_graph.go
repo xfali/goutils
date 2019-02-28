@@ -1,3 +1,13 @@
+/**
+ * Copyright (C) 2019, Xiongfa Li.
+ * All right reserved.
+ * @author xiongfa.li
+ * @date 2019/2/17
+ * @time 14:25
+ * @version V1.0
+ * Description:
+ */
+
 package mapGraph
 /*
     符合Graph的逻辑，但是由于底层使用HashMap存储，所以便利顺序受Hash影响，存在与存入顺序不一致的情况
