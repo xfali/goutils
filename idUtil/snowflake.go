@@ -42,7 +42,6 @@ const (
     sequenceMask = -1 ^ (-1 << sequenceBits)
 )
 
-
 /**
  * @author Xiongfa Li
  * 唯一ID生成器，从2017年12月5日开始，能够使用68年左右，最大占19位字符
@@ -59,6 +58,13 @@ type SnowFlake struct {
 
     lock sync.Mutex
 }
+
+const (
+    KEY_TIMESTAMP    = "timestamp"
+    KEY_WORKERID     = "workerId"
+    KEY_DATACENTERID = "datacenterId"
+    KEY_SEQUENCE     = "sequence"
+)
 
 type SFId int64
 type SFStrId string
@@ -107,12 +113,11 @@ func (sf *SnowFlake) NextId() (SFId, error) {
     if timestamp < sf.lastTimestamp {
         return -1, errors.New(fmt.Sprintf("Clock moved backwards.  Refusing to generate idUtil for %d milliseconds", sf.lastTimestamp-timestamp))
     }
-
     if sf.lastTimestamp == timestamp {
         // 当前毫秒内，则+1
         sf.sequence = (sf.sequence + 1) & sequenceMask
         if sf.sequence == 0 {
-            // 当前毫秒内计数满了，则等待下一秒
+            // 当前毫秒内计数满了，则等待下一毫秒
             timestamp = sf.tilNextMillis(sf.lastTimestamp)
         }
     } else {
@@ -121,18 +126,27 @@ func (sf *SnowFlake) NextId() (SFId, error) {
     sf.lastTimestamp = timestamp
     // ID偏移组合生成最终的ID，并返回ID
     nextId := ((timestamp - twepoch) << timestampLeftShift) | (sf.datacenterId << datacenterIdShift) | (sf.workerId << workerIdShift) | sf.sequence
-
     return SFId(nextId), nil
 }
 
 func (sf *SnowFlake) tilNextMillis(lastTimestamp int64) int64 {
-    timestamp := sf.timeGen()
-    for timestamp <= lastTimestamp {
-        timestamp = sf.timeGen()
+    timestamp := time.Duration(lastTimestamp+1) * 1e6
+    sleepTime := timestamp - time.Duration(time.Now().UnixNano())
+    if sleepTime > 0 {
+        select {
+        case <-time.After(sleepTime):
+
+        }
     }
-    return timestamp
+    return int64(time.Now().UnixNano() / 1e6)
+    //timestamp := sf.timeGen()
+    //for timestamp <= lastTimestamp {
+    //   timestamp = sf.timeGen()
+    //}
+    //return timestamp
 }
 
+//当前时间戳（毫秒）
 func (sf *SnowFlake) timeGen() int64 {
     return time.Now().UnixNano() / int64(time.Millisecond)
 }
@@ -154,7 +168,7 @@ func getMaxWorkerId(dataCenterId int64, maxWorkerId int64) int64 {
 // * 数据标识id部分
 // * </p>
 // */
-func getDatacenterId(maxDatacenterId int) int64 {
+func getDatacenterId(maxDatacenterId int64) int64 {
     intes, err := net.Interfaces()
     if err == nil {
         for i := 0; i < len(intes); i++ {
@@ -164,42 +178,60 @@ func getDatacenterId(maxDatacenterId int) int64 {
                 continue
             }
             id := ((0x000000FF & int64(mac[macLen-1])) | (0x0000FF00 & (int64(mac[macLen-2]) << 8))) >> 6
+            id = id % (maxDatacenterId + 1)
             return id
         }
     }
     return 1
 }
 
-func (id SFId)Int64() int64 {
+//获得int64类型的id
+func (id SFId) Int64() int64 {
     return int64(id)
 }
 
-func (id SFId)LimitString(bit int) string {
+//获得指定长度的string类型的id，不足部分以0补全
+func (id SFId) LimitString(bit int) string {
     bitStr := "%0" + strconv.Itoa(bit) + "d"
     return fmt.Sprintf(bitStr, id)
 }
 
-func (id SFId)String() string {
+//获得string类型id
+func (id SFId) String() string {
     return strconv.FormatInt(int64(id), 10)
 }
 
-func (id SFId)Timestamp() time.Duration {
-    return time.Duration(twepoch + (id >> timestampLeftShift)) * time.Millisecond
+//获得string类型id
+func (id SFId) Parse() map[string]int64 {
+    ret := map[string]int64{}
+    ret[KEY_TIMESTAMP] = int64(twepoch + (id >> timestampLeftShift))
+    ret[KEY_SEQUENCE] = int64(id & sequenceMask)
+    ret[KEY_WORKERID] = int64((id >> workerIdShift) & maxWorkerId)
+    ret[KEY_DATACENTERID] = int64((id >> datacenterIdShift) & maxDatacenterId)
+    return ret
 }
 
-func (id SFId)Compress() SFStrId {
+//获得时间戳
+func (id SFId) Timestamp() time.Duration {
+    return time.Duration(twepoch+(id>>timestampLeftShift)) * time.Millisecond
+}
+
+//将id转换为压缩SFStrId（string）类型
+func (id SFId) Compress() SFStrId {
     return SFStrId(Compress2StringUL(int64(id)))
 }
 
-func (sid SFStrId)String() string {
+//压缩SFStrId转换为string类型
+func (sid SFStrId) String() string {
     return string(sid)
 }
 
-func (sid SFStrId)UnCompress() SFId {
+//压缩SFStrId转换为SFId类型
+func (sid SFStrId) UnCompress() SFId {
     return SFId(Uncompress2LongUL(string(sid)))
 }
 
-func (id SFId)Time() time.Time {
+func (id SFId) Time() time.Time {
     t := int64(id.Timestamp())
     return time.Unix(0, t)
 }

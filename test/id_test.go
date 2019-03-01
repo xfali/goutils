@@ -9,9 +9,12 @@
 package test
 
 import (
+    "container/list"
     "fmt"
+    "goid"
     "goutils/idUtil"
     "testing"
+    "time"
 )
 
 func TestRandomId(t *testing.T) {
@@ -39,4 +42,37 @@ func TestSnowFlakeId(t *testing.T) {
     sid := id.Compress()
     fmt.Printf("compress id %s\n", sid)
     fmt.Printf("uncompress id %d\n", sid.UnCompress())
+}
+
+
+func TestSnowFlakeId2(t *testing.T) {
+    sf := goid.NewSnowFlake()
+    i := 0
+    now := time.Now()
+    l := list.New()
+    for {
+        id, _ := sf.NextId()
+        l.PushBack(id)
+        if i == 10000 {
+            break
+        }
+        i++
+    }
+    fmt.Printf("use time :%d ms\n", time.Since(now).Nanoseconds()/1e6)
+
+    k, g := 0, 0
+    for e1:=l.Front(); e1!=nil; e1=e1.Next() {
+        //t.Logf("id is %d\n", e1.Value.(goid.SFId))
+        for e2:=e1.Next(); e2!=nil; e2=e2.Next() {
+            if e1.Value.(goid.SFId) == e2.Value.(goid.SFId) {
+                for k, v := range e1.Value.(goid.SFId).Parse() {
+                    t.Logf("k :%s v: %d \n", k, v)
+                }
+                t.Fatalf("Same id! %d %d at %d %d\n", e1.Value.(goid.SFId) , e2.Value.(goid.SFId), k, g)
+            }
+            g++
+        }
+        k++
+        g=k+1
+    }
 }
