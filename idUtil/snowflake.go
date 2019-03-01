@@ -231,6 +231,7 @@ func (sid SFStrId) UnCompress() SFId {
     return SFId(Uncompress2LongUL(string(sid)))
 }
 
+//获得时间
 func (id SFId) Time() time.Time {
     t := int64(id.Timestamp())
     return time.Unix(0, t)

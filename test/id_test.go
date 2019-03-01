@@ -31,7 +31,7 @@ func TestSnowFlakeId(t *testing.T) {
         return
     }
 
-    fmt.Printf("idUtil is %d, timestamp %s limitstr %s\n", id.Int64(), id.Timestamp(), id.LimitString(30))
+    fmt.Printf("idUtil is %d, timestamp %d limitstr %s str %s\n", id.Int64(), id.Timestamp(), id.LimitString(30), id.String())
     fmt.Printf("time is %v\n", id.Time())
 
     str := idUtil.Compress2StringUL2(id.Int64(), 20)
