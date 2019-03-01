@@ -8,7 +8,7 @@
  * Description: 
  */
 
-package id
+package idUtil
 
 import (
     "crypto/rand"
