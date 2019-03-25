@@ -136,3 +136,13 @@ func (dm *RecycleMap) TTL(key string) time.Duration {
         return -1
     }
 }
+
+func (dm *RecycleMap) Multi() error {
+    dm.Lock.Lock()
+    return nil
+}
+
+func (dm *RecycleMap) Exec() error {
+    dm.Lock.Unlock()
+    return nil
+}
