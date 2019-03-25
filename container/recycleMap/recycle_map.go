@@ -130,7 +130,7 @@ func (dm *RecycleMap) SetExpire(key interface{}, expireIn time.Duration) bool {
 }
 
 //获得key过期时间
-func (dm *RecycleMap) TTL(key string) time.Duration {
+func (dm *RecycleMap) TTL(key interface{}) time.Duration {
     dm.Lock.Lock()
     defer dm.Lock.Unlock()
 
