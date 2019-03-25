@@ -11,8 +11,7 @@ package test
 import (
     "container/list"
     "fmt"
-    "goid"
-    "goutils/idUtil"
+    "github.com/xfali/goutils/idUtil"
     "testing"
     "time"
 )
@@ -46,7 +45,7 @@ func TestSnowFlakeId(t *testing.T) {
 
 
 func TestSnowFlakeId2(t *testing.T) {
-    sf := goid.NewSnowFlake()
+    sf := idUtil.NewSnowFlake()
     i := 0
     now := time.Now()
     l := list.New()
@@ -64,11 +63,11 @@ func TestSnowFlakeId2(t *testing.T) {
     for e1:=l.Front(); e1!=nil; e1=e1.Next() {
         //t.Logf("id is %d\n", e1.Value.(goid.SFId))
         for e2:=e1.Next(); e2!=nil; e2=e2.Next() {
-            if e1.Value.(goid.SFId) == e2.Value.(goid.SFId) {
-                for k, v := range e1.Value.(goid.SFId).Parse() {
+            if e1.Value.(idUtil.SFId) == e2.Value.(idUtil.SFId) {
+                for k, v := range e1.Value.(idUtil.SFId).Parse() {
                     t.Logf("k :%s v: %d \n", k, v)
                 }
-                t.Fatalf("Same id! %d %d at %d %d\n", e1.Value.(goid.SFId) , e2.Value.(goid.SFId), k, g)
+                t.Fatalf("Same id! %d %d at %d %d\n", e1.Value.(idUtil.SFId) , e2.Value.(idUtil.SFId), k, g)
             }
             g++
         }
