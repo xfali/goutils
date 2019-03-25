@@ -33,8 +33,6 @@ func New() *RecycleMap {
         Lock: &sync.Mutex{},
     }
 
-    ret.Init()
-
     return ret
 }
 
@@ -50,8 +48,8 @@ func (dm *RecycleMap) purge() {
     }
 }
 
-//初始化，必须调用（New内部已调用）
-func (dm *RecycleMap) Init() {
+//初始化并开启回收线程，必须调用
+func (dm *RecycleMap) Run() {
     if dm.PurgeInterval <= 0 {
         dm.PurgeInterval = 0
     }

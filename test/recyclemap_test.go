@@ -16,6 +16,7 @@ import (
 
 func TestRecycleMap(t *testing.T) {
     dm := recycleMap.New()
+    dm.Run()
 
     dm.Set("123", "456", time.Second)
 
