@@ -144,12 +144,12 @@ func (dm *RecycleMap) TTL(key interface{}) time.Duration {
 
 //开启事务
 func (dm *RecycleMap) Multi() error {
-    dm.Lock.Lock()
+    //dm.Lock.Lock()
     return nil
 }
 
 //执行事务
 func (dm *RecycleMap) Exec() error {
-    dm.Lock.Unlock()
+    //dm.Lock.Unlock()
     return nil
 }
