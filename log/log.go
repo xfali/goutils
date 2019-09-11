@@ -8,6 +8,7 @@ package log
 
 import (
     "fmt"
+    "io"
     "os"
     "runtime"
     "time"
@@ -55,7 +56,7 @@ var Log LogFunc = DefaultLogf
 
 var Level = DEBUG
 
-var Writer = os.Stdout
+var Writer io.Writer = os.Stdout
 
 var gLogInnerLevel = DEBUG
 
@@ -65,7 +66,7 @@ func DefaultLogf(level int, format string, args ...interface{}) {
     }
 
     length := len(format)
-    if length > 0 && format[length - 1] != '\n' {
+    if length > 0 && format[length-1] != '\n' {
         format = format + "\n"
     }
 
