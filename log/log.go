@@ -58,7 +58,7 @@ var Level = DEBUG
 
 var Writer io.Writer = os.Stdout
 
-var gLogInnerLevel = DEBUG
+var InnerLevel = DEBUG
 
 func DefaultLogf(level int, format string, args ...interface{}) {
     if Level > level {
@@ -114,7 +114,7 @@ func Fatal(format string, args ...interface{}) {
 }
 
 func InnerLog(format string, args ...interface{}) {
-    Log(gLogInnerLevel, format, args...)
+    Log(InnerLevel, format, args...)
 }
 
 func TimeFormat(t time.Time) string {
