@@ -3,33 +3,33 @@
  * All right reserved.
  * @author xiongfa.li
  * @version V1.0
- * Description: 
+ * Description:
  */
 
 package test
 
 import (
-    "testing"
-    "github.com/xfali/goutils/container/recycleMap"
-    "time"
+	"github.com/xfali/goutils/container/recycleMap"
+	"testing"
+	"time"
 )
 
 func TestRecycleMap(t *testing.T) {
-    dm := recycleMap.New()
-    dm.Run()
+	dm := recycleMap.New()
+	dm.Run()
 
-    dm.Set("123", "456", time.Second)
+	dm.Set("123", "456", time.Second)
 
-    v1 := dm.Get("123")
-    t.Logf("value is %v\n", v1)
+	v1 := dm.Get("123")
+	t.Logf("value is %v\n", v1)
 
-    time.Sleep(time.Second)
+	time.Sleep(time.Second)
 
-    v2 := dm.Get("123")
-    t.Logf("After 1 second value is %v\n", v2)
+	v2 := dm.Get("123")
+	t.Logf("After 1 second value is %v\n", v2)
 
-    time.Sleep(time.Millisecond)
+	time.Sleep(time.Millisecond)
 
-    v3 := dm.Get("123")
-    t.Logf("After 1 second 1 Millisecond value is %v\n", v3)
+	v3 := dm.Get("123")
+	t.Logf("After 1 second 1 Millisecond value is %v\n", v3)
 }
