@@ -8,3 +8,4 @@ goutils/container
  - 阻塞队列blockqueue
  - 图mapGraph
  - Set
+ - skiplist
