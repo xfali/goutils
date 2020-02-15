@@ -23,6 +23,10 @@ type Node struct {
 	forward []*Node
 }
 
+type Iterator struct {
+	n *Node
+}
+
 type SkipList struct {
 	maxLv int
 	p     float32
@@ -46,7 +50,7 @@ func New(opts ...Opt) *SkipList {
 		panic("keyCmp or valueCmp is nil!")
 	}
 	ret.header = makeNode(ret.maxLv, nil, nil)
-	fillForward(ret.header.forward)
+	//fillForward(ret.header.forward)
 	return ret
 }
 
@@ -78,36 +82,36 @@ func randomLevel() int {
 	return level
 }
 
-func (list *SkipList) Search(searchKey interface{}) interface{} {
+func (list *SkipList) Get(searchKey interface{}) interface{} {
 	x := list.header
 	i := list.level
 	for i >= 0 {
-		for list.keyCmp(x.forward[i].key, searchKey) < 0 {
+		for x.forward[i] != nil && list.keyCmp(x.forward[i].key, searchKey) < 0 {
 			x = x.forward[i]
 		}
 		i--
 	}
 	x = x.forward[0]
-	if list.keyCmp(x.key, searchKey) == 0 {
+	if x != nil && list.keyCmp(x.key, searchKey) == 0 {
 		return x.value
 	} else {
 		return nil
 	}
 }
 
-func (list *SkipList) Insert(searchKey, newValue interface{}) {
+func (list *SkipList) Set(searchKey, newValue interface{}) {
 	update := make([]*Node, list.maxLv)
 	x := list.header
 	i := list.level
 	for i >= 0 {
-		for list.keyCmp(x.forward[i].key, searchKey) < 0 {
+		for x.forward[i] != nil && list.keyCmp(x.forward[i].key, searchKey) < 0 {
 			x = x.forward[i]
 		}
 		update[i] = x
 		i--
 	}
 	x = x.forward[0]
-	if list.keyCmp(x.key, searchKey) == 0 {
+	if x != nil && list.keyCmp(x.key, searchKey) == 0 {
 		x.value = newValue
 	} else {
 		lvl := randomLevel()
@@ -135,14 +139,14 @@ func (list *SkipList) Delete(searchKey interface{}) bool {
 	x := list.header
 	i := list.level
 	for i >= 0 {
-		for list.keyCmp(x.forward[i].key, searchKey) < 0 {
+		for x.forward[i] != nil && list.keyCmp(x.forward[i].key, searchKey) < 0 {
 			x = x.forward[i]
 		}
 		update[i] = x
 		i--
 	}
 	x = x.forward[0]
-	if list.keyCmp(x.key, searchKey) == 0 {
+	if x != nil && list.keyCmp(x.key, searchKey) == 0 {
 		i := 0
 		for i <= list.level {
 			if update[i].forward[i] != x {
@@ -188,18 +192,83 @@ func (list *SkipList) Values(size int) []interface{} {
 	return ret
 }
 
+func (list *SkipList) First() *Iterator {
+	if list.header.forward[0] == nil {
+		return nil
+	}
+	return &Iterator{n: list.header.forward[0]}
+}
+
+func (list *SkipList) Last() *Iterator {
+	x := list.header.forward[0]
+	if x == nil {
+		return nil
+	}
+	for x != nil {
+		if x.forward[0] == nil {
+			return &Iterator{n: x}
+		}
+		x = x.forward[0]
+	}
+	return nil
+}
+
+func (list *SkipList) FirstNear(searchKey interface{}) *Iterator {
+	x := list.header
+	i := list.level
+	for i >= 0 {
+		for x.forward[i] != nil && list.keyCmp(x.forward[i].key, searchKey) < 0 {
+			x = x.forward[i]
+		}
+		i--
+	}
+	x = x.forward[0]
+	if x == nil {
+		return nil
+	}
+	return &Iterator{n: x}
+}
+
+func (it *Iterator) Next() *Iterator {
+	if it.n == nil {
+		return nil
+	}
+	it.n = it.n.forward[0]
+	if it.n == nil {
+		return nil
+	}
+	return it
+}
+
+func (it *Iterator) Key() interface{} {
+	if it.n == nil {
+		return nil
+	}
+
+	return it.n.key
+}
+
+func (it *Iterator) Value() interface{} {
+	if it.n == nil {
+		return nil
+	}
+
+	return it.n.value
+}
+
+func (it *Iterator) KeyValue() (interface{}, interface{}) {
+	if it.n == nil {
+		return nil, nil
+	}
+
+	return it.n.value, it.n.value
+}
+
 func makeNode(lvl int, searchKey, newValue interface{}) *Node {
 	return &Node{
 		key:     searchKey,
 		value:   newValue,
 		forward: make([]*Node, lvl+1),
-	}
-}
-
-func fillForward(nodes []*Node) {
-	vs := make([]Node, len(nodes))
-	for i := range nodes {
-		nodes[i] = &vs[i]
 	}
 }
 

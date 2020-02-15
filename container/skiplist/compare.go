@@ -6,35 +6,32 @@
 package skiplist
 
 func CompareInt(a, b interface{}) int {
-	if a == nil {
-		if b == nil {
-			return 0
-		} else {
-			return b.(int)
-		}
-	} else {
-		if b == nil {
-			return a.(int)
-		} else {
-			x1 := a.(int)
-			x2 := b.(int)
-			return x1 - x2
-		}
+	x1 := 0
+	if a != nil {
+		x1 = a.(int)
 	}
+	x2 := b.(int)
+	return x1 - x2
 }
 
 func CompareInt64(a, b interface{}) int {
-	x1 := a.(int64)
+	var x1 int64 = 0
+	if a != nil {
+		x1 = a.(int64)
+	}
 	x2 := b.(int64)
 	return int(x1 - x2)
 }
 
 func CompareFloat32(a, b interface{}) int {
-	x1 := a.(float32)
+	var x1 float32 = 0
+	if a != nil {
+		x1 = a.(float32)
+	}
 	x2 := b.(float32)
 	if x1 > x2 {
 		return 1
-	} else if x2 > x1{
+	} else if x2 > x1 {
 		return -1
 	} else {
 		return 0
@@ -42,11 +39,14 @@ func CompareFloat32(a, b interface{}) int {
 }
 
 func CompareFloat64(a, b interface{}) int {
-	x1 := a.(float64)
+	var x1 float64 = 0
+	if a != nil {
+		x1 = a.(float64)
+	}
 	x2 := b.(float64)
 	if x1 > x2 {
 		return 1
-	} else if x2 > x1{
+	} else if x2 > x1 {
 		return -1
 	} else {
 		return 0
