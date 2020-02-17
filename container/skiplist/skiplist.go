@@ -7,6 +7,7 @@ package skiplist
 
 import (
 	"math/rand"
+	"time"
 )
 
 const (
@@ -31,8 +32,10 @@ type SkipList struct {
 	maxLv int
 	p     float32
 
-	level  int
-	len    int
+	level int
+	len   int
+
+	rand   *rand.Rand
 	header *Node
 	keyCmp Compare
 }
@@ -41,6 +44,7 @@ func New(opts ...Opt) *SkipList {
 	ret := &SkipList{
 		maxLv: SKIPLIST_MAX_LEVEL,
 		p:     SKIPLIST_P,
+		rand:  rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
 	for _, v := range opts {
 		v(ret)
@@ -72,7 +76,7 @@ func SetP(p float32) Opt {
 	}
 }
 
-func randomLevel() int {
+func randomLevel(rand *rand.Rand) int {
 	level := 1
 	f := 0xFFFF * float32(SKIPLIST_P)
 	for ((rand.Int() & 0xFFFF) < int(f)) && (SKIPLIST_MAX_LEVEL > level) {
@@ -114,7 +118,7 @@ func (list *SkipList) Set(searchKey, newValue interface{}) {
 	if x != nil && list.keyCmp(x.key, searchKey) == 0 {
 		x.value = newValue
 	} else {
-		lvl := randomLevel()
+		lvl := randomLevel(list.rand)
 		if lvl > list.level {
 			i := list.level + 1
 			for i <= lvl {
