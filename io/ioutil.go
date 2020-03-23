@@ -10,7 +10,6 @@ import (
     "io/ioutil"
     "os"
     "path/filepath"
-    "syscall"
 )
 
 // 判断文件夹是否存在
@@ -68,15 +67,4 @@ func WalkDir(path string) error {
 
 func GetDirFiles(dir string) ([]os.FileInfo, error) {
     return ioutil.ReadDir(dir)
-}
-
-func SetInvisible(path string) error {
-    namep, err := syscall.UTF16PtrFromString(path)
-    if err != nil {
-       return err
-    }
-    if err := syscall.SetFileAttributes(namep, syscall.FILE_ATTRIBUTE_HIDDEN); err != nil {
-        return err
-    }
-    return nil
 }
