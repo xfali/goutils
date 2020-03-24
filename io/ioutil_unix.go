@@ -7,6 +7,8 @@
 
 package io
 
+import "errors"
+
 func SetInvisible(path string) error {
     return errors.New("Not support")
 }
