@@ -2,10 +2,10 @@
  * Copyright (C) 2018, Xiongfa Li.
  * All right reserved.
  * @author xiongfa.li
- * @date 2018/7/23 
+ * @date 2018/7/23
  * @time 16:15
  * @version V1.0
- * Description: 
+ * Description:
  */
 
 package container
@@ -16,25 +16,25 @@ import (
 )
 
 type BlockQueue struct {
-    list *list.List
+    list    *list.List
     maxSize int
-    lock *sync.Mutex
-    cond *sync.Cond
+    lock    *sync.Mutex
+    cond    *sync.Cond
 }
 
-type OnEnqueque func(data interface{})(bool)
+type OnEnqueque func(data interface{}) (bool)
 
 func NewBlockQueue(maxSize int) (*BlockQueue) {
     lock := &sync.Mutex{}
     return &BlockQueue{
-        list: list.New(),
+        list:    list.New(),
         maxSize: maxSize,
-        lock: lock,
-        cond: sync.NewCond(lock),
+        lock:    lock,
+        cond:    sync.NewCond(lock),
     }
 }
 
-func (bq *BlockQueue)Enqueue(data interface{}) {
+func (bq *BlockQueue) Enqueue(data interface{}) {
     bq.lock.Lock()
     defer bq.lock.Unlock()
 
@@ -49,7 +49,7 @@ func (bq *BlockQueue)Enqueue(data interface{}) {
     bq.list.PushBack(data)
 }
 
-func (bq *BlockQueue)TryEnqueue(data interface{}) (bool) {
+func (bq *BlockQueue) TryEnqueue(data interface{}) (bool) {
     bq.lock.Lock()
     defer bq.lock.Unlock()
 
@@ -108,4 +108,3 @@ func (bq *BlockQueue) Dequeue() interface{} {
     elm := bq.list.Front()
     return bq.list.Remove(elm)
 }
-
