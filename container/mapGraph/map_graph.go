@@ -10,7 +10,7 @@
 
 package mapGraph
 /*
-    符合Graph的逻辑，但是由于底层使用HashMap存储，所以便利顺序受Hash影响，存在与存入顺序不一致的情况
+    符合Graph的逻辑，但是由于底层使用HashMap存储，所以遍历顺序受Hash影响，存在与存入顺序不一致的情况
  */
 import (
 	"container/list"

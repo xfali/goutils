@@ -65,12 +65,17 @@ func DefaultLogf(level int, format string, args ...interface{}) {
         return
     }
 
+    logInfo := ""
     length := len(format)
-    if length > 0 && format[length-1] != '\n' {
-        format = format + "\n"
+    if length > 0 {
+        if format[length-1] != '\n' {
+            format = format + "\n"
+        }
+        logInfo = fmt.Sprintf(format, args...)
+    } else {
+        logInfo = fmt.Sprintln(args...)
     }
 
-    logInfo := fmt.Sprintf(format, args...)
     var file string
     var line int
     var ok bool
