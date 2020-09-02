@@ -84,7 +84,7 @@ func DefaultLogf(level int, format string, args ...interface{}) {
 		file = "???"
 		line = 0
 	}
-	fmt.Fprintf(Writer, "%s %s %s:%d %s", gLogTag[level], TimeFormat(time.Now()), shortFile(file), line, logInfo)
+	Writer.Write([]byte(fmt.Sprintf("%s %s %s:%d %s", gLogTag[level], TimeFormat(time.Now()), shortFile(file), line, logInfo)))
 	if level >= FATAL {
 		os.Exit(-1)
 	}
