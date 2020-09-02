@@ -3,43 +3,43 @@
  * All right reserved.
  * @author xiongfa.li
  * @version V1.0
- * Description: 
+ * Description:
  */
 
 package idUtil
 
 import (
-    "errors"
-    "fmt"
-    "hash/crc32"
-    "net"
-    "os"
-    "strconv"
-    "sync"
-    "time"
+	"errors"
+	"fmt"
+	"hash/crc32"
+	"net"
+	"os"
+	"strconv"
+	"sync"
+	"time"
 )
 
 const (
-    // 时间起始标记点，作为基准，一般取系统的最近时间（一旦确定不能变动）
-    twepoch = 1512443299165
-    // 机器标识位数
-    workerIdBits = 5
-    // 数据中心标识位数
-    datacenterIdBits = 5
-    // 机器ID最大值
-    maxWorkerId = -1 ^ (-1 << workerIdBits)
-    // 数据中心ID最大值
-    maxDatacenterId = -1 ^ (-1 << datacenterIdBits)
-    // 毫秒内自增位
-    sequenceBits = 12
-    // 机器ID偏左移12位
-    workerIdShift = sequenceBits
-    // 数据中心ID左移17位
-    datacenterIdShift = sequenceBits + workerIdBits
-    // 时间毫秒左移22位
-    timestampLeftShift = sequenceBits + workerIdBits + datacenterIdBits
-    // 最大毫秒自增
-    sequenceMask = -1 ^ (-1 << sequenceBits)
+	// 时间起始标记点，作为基准，一般取系统的最近时间（一旦确定不能变动）
+	twepoch = 1512443299165
+	// 机器标识位数
+	workerIdBits = 5
+	// 数据中心标识位数
+	datacenterIdBits = 5
+	// 机器ID最大值
+	maxWorkerId = -1 ^ (-1 << workerIdBits)
+	// 数据中心ID最大值
+	maxDatacenterId = -1 ^ (-1 << datacenterIdBits)
+	// 毫秒内自增位
+	sequenceBits = 12
+	// 机器ID偏左移12位
+	workerIdShift = sequenceBits
+	// 数据中心ID左移17位
+	datacenterIdShift = sequenceBits + workerIdBits
+	// 时间毫秒左移22位
+	timestampLeftShift = sequenceBits + workerIdBits + datacenterIdBits
+	// 最大毫秒自增
+	sequenceMask = -1 ^ (-1 << sequenceBits)
 )
 
 /**
@@ -47,36 +47,36 @@ const (
  * 唯一ID生成器，从2017年12月5日开始，能够使用68年左右，最大占19位字符
  */
 type SnowFlake struct {
-    /* 上次生产id时间戳 */
-    lastTimestamp int64
-    // 0，并发控制
-    sequence int64
-    //工作节点id
-    workerId int64
-    // 数据中心ID
-    datacenterId int64
+	/* 上次生产id时间戳 */
+	lastTimestamp int64
+	// 0，并发控制
+	sequence int64
+	//工作节点id
+	workerId int64
+	// 数据中心ID
+	datacenterId int64
 
-    lock sync.Mutex
+	lock sync.Mutex
 }
 
 const (
-    KEY_TIMESTAMP    = "timestamp"
-    KEY_WORKERID     = "workerId"
-    KEY_DATACENTERID = "datacenterId"
-    KEY_SEQUENCE     = "sequence"
+	KEY_TIMESTAMP    = "timestamp"
+	KEY_WORKERID     = "workerId"
+	KEY_DATACENTERID = "datacenterId"
+	KEY_SEQUENCE     = "sequence"
 )
 
 type SFId int64
 type SFStrId string
 
 func NewSnowFlake() *SnowFlake {
-    ret := &SnowFlake{
-        lastTimestamp: -1,
-        sequence:      0,
-    }
-    ret.datacenterId = getDatacenterId(maxDatacenterId)
-    ret.workerId = getMaxWorkerId(ret.datacenterId, maxWorkerId)
-    return ret
+	ret := &SnowFlake{
+		lastTimestamp: -1,
+		sequence:      0,
+	}
+	ret.datacenterId = getDatacenterId(maxDatacenterId)
+	ret.workerId = getMaxWorkerId(ret.datacenterId, maxWorkerId)
+	return ret
 }
 
 /**
@@ -86,18 +86,18 @@ func NewSnowFlake() *SnowFlake {
  *            序列号
  */
 func NewSnowFlakeWithId(workerId int64, dataCenterId int64) *SnowFlake {
-    if workerId > maxWorkerId || workerId < 0 {
-        panic(fmt.Sprintf("worker Id can't be greater than %d or less than 0", maxWorkerId))
-    }
-    if dataCenterId > maxDatacenterId || dataCenterId < 0 {
-        panic(fmt.Sprintf("datacenter Id can't be greater than %d or less than 0", maxDatacenterId))
-    }
-    return &SnowFlake{
-        lastTimestamp: -1,
-        sequence:      0,
-        workerId:      workerId,
-        datacenterId:  dataCenterId,
-    }
+	if workerId > maxWorkerId || workerId < 0 {
+		panic(fmt.Sprintf("worker Id can't be greater than %d or less than 0", maxWorkerId))
+	}
+	if dataCenterId > maxDatacenterId || dataCenterId < 0 {
+		panic(fmt.Sprintf("datacenter Id can't be greater than %d or less than 0", maxDatacenterId))
+	}
+	return &SnowFlake{
+		lastTimestamp: -1,
+		sequence:      0,
+		workerId:      workerId,
+		datacenterId:  dataCenterId,
+	}
 }
 
 /**
@@ -106,60 +106,60 @@ func NewSnowFlakeWithId(workerId int64, dataCenterId int64) *SnowFlake {
  * @return
  */
 func (sf *SnowFlake) NextId() (SFId, error) {
-    sf.lock.Lock()
-    defer sf.lock.Unlock()
+	sf.lock.Lock()
+	defer sf.lock.Unlock()
 
-    timestamp := sf.timeGen()
-    if timestamp < sf.lastTimestamp {
-        return -1, errors.New(fmt.Sprintf("Clock moved backwards.  Refusing to generate idUtil for %d milliseconds", sf.lastTimestamp-timestamp))
-    }
-    if sf.lastTimestamp == timestamp {
-        // 当前毫秒内，则+1
-        sf.sequence = (sf.sequence + 1) & sequenceMask
-        if sf.sequence == 0 {
-            // 当前毫秒内计数满了，则等待下一毫秒
-            timestamp = sf.tilNextMillis(sf.lastTimestamp)
-        }
-    } else {
-        sf.sequence = 0
-    }
-    sf.lastTimestamp = timestamp
-    // ID偏移组合生成最终的ID，并返回ID
-    nextId := ((timestamp - twepoch) << timestampLeftShift) | (sf.datacenterId << datacenterIdShift) | (sf.workerId << workerIdShift) | sf.sequence
-    return SFId(nextId), nil
+	timestamp := sf.timeGen()
+	if timestamp < sf.lastTimestamp {
+		return -1, errors.New(fmt.Sprintf("Clock moved backwards.  Refusing to generate idUtil for %d milliseconds", sf.lastTimestamp-timestamp))
+	}
+	if sf.lastTimestamp == timestamp {
+		// 当前毫秒内，则+1
+		sf.sequence = (sf.sequence + 1) & sequenceMask
+		if sf.sequence == 0 {
+			// 当前毫秒内计数满了，则等待下一毫秒
+			timestamp = sf.tilNextMillis(sf.lastTimestamp)
+		}
+	} else {
+		sf.sequence = 0
+	}
+	sf.lastTimestamp = timestamp
+	// ID偏移组合生成最终的ID，并返回ID
+	nextId := ((timestamp - twepoch) << timestampLeftShift) | (sf.datacenterId << datacenterIdShift) | (sf.workerId << workerIdShift) | sf.sequence
+	return SFId(nextId), nil
 }
 
 func (sf *SnowFlake) tilNextMillis(lastTimestamp int64) int64 {
-    timestamp := time.Duration(lastTimestamp+1) * 1e6
-    sleepTime := timestamp - time.Duration(time.Now().UnixNano())
-    if sleepTime > 0 {
-        select {
-        case <-time.After(sleepTime):
+	timestamp := time.Duration(lastTimestamp+1) * 1e6
+	sleepTime := timestamp - time.Duration(time.Now().UnixNano())
+	if sleepTime > 0 {
+		select {
+		case <-time.After(sleepTime):
 
-        }
-    }
-    return int64(time.Now().UnixNano() / 1e6)
-    //timestamp := sf.timeGen()
-    //for timestamp <= lastTimestamp {
-    //   timestamp = sf.timeGen()
-    //}
-    //return timestamp
+		}
+	}
+	return int64(time.Now().UnixNano() / 1e6)
+	//timestamp := sf.timeGen()
+	//for timestamp <= lastTimestamp {
+	//   timestamp = sf.timeGen()
+	//}
+	//return timestamp
 }
 
 //当前时间戳（毫秒）
 func (sf *SnowFlake) timeGen() int64 {
-    return time.Now().UnixNano() / int64(time.Millisecond)
+	return time.Now().UnixNano() / int64(time.Millisecond)
 }
 
 /**
 * <p>
 * 获取 maxWorkerId
 * </p>
-*/
+ */
 func getMaxWorkerId(dataCenterId int64, maxWorkerId int64) int64 {
-    pid := os.Getpid()
-    str := fmt.Sprintf("%d%d", dataCenterId, pid)
-    return (int64(crc32.ChecksumIEEE([]byte(str))) & 0xffff) % (maxWorkerId + 1)
+	pid := os.Getpid()
+	str := fmt.Sprintf("%d%d", dataCenterId, pid)
+	return (int64(crc32.ChecksumIEEE([]byte(str))) & 0xffff) % (maxWorkerId + 1)
 }
 
 //
@@ -169,118 +169,118 @@ func getMaxWorkerId(dataCenterId int64, maxWorkerId int64) int64 {
 // * </p>
 // */
 func getDatacenterId(maxDatacenterId int64) int64 {
-    intes, err := net.Interfaces()
-    if err == nil {
-        for i := 0; i < len(intes); i++ {
-            mac := intes[i].HardwareAddr
-            macLen := len(mac)
-            if macLen == 0 {
-                continue
-            }
-            id := ((0x000000FF & int64(mac[macLen-1])) | (0x0000FF00 & (int64(mac[macLen-2]) << 8))) >> 6
-            id = id % (maxDatacenterId + 1)
-            return id
-        }
-    }
-    return 1
+	intes, err := net.Interfaces()
+	if err == nil {
+		for i := 0; i < len(intes); i++ {
+			mac := intes[i].HardwareAddr
+			macLen := len(mac)
+			if macLen == 0 {
+				continue
+			}
+			id := ((0x000000FF & int64(mac[macLen-1])) | (0x0000FF00 & (int64(mac[macLen-2]) << 8))) >> 6
+			id = id % (maxDatacenterId + 1)
+			return id
+		}
+	}
+	return 1
 }
 
 //获得int64类型的id
 func (id SFId) Int64() int64 {
-    return int64(id)
+	return int64(id)
 }
 
 //获得指定长度的string类型的id，不足部分以0补全
 func (id SFId) LimitString(bit int) string {
-    bitStr := "%0" + strconv.Itoa(bit) + "d"
-    return fmt.Sprintf(bitStr, id)
+	bitStr := "%0" + strconv.Itoa(bit) + "d"
+	return fmt.Sprintf(bitStr, id)
 }
 
 //获得string类型id
 func (id SFId) String() string {
-    return strconv.FormatInt(int64(id), 10)
+	return strconv.FormatInt(int64(id), 10)
 }
 
 //获得string类型id
 func (id SFId) Parse() map[string]int64 {
-    ret := map[string]int64{}
-    ret[KEY_TIMESTAMP] = int64(twepoch + (id >> timestampLeftShift))
-    ret[KEY_SEQUENCE] = int64(id & sequenceMask)
-    ret[KEY_WORKERID] = int64((id >> workerIdShift) & maxWorkerId)
-    ret[KEY_DATACENTERID] = int64((id >> datacenterIdShift) & maxDatacenterId)
-    return ret
+	ret := map[string]int64{}
+	ret[KEY_TIMESTAMP] = int64(twepoch + (id >> timestampLeftShift))
+	ret[KEY_SEQUENCE] = int64(id & sequenceMask)
+	ret[KEY_WORKERID] = int64((id >> workerIdShift) & maxWorkerId)
+	ret[KEY_DATACENTERID] = int64((id >> datacenterIdShift) & maxDatacenterId)
+	return ret
 }
 
 //获得时间戳
 func (id SFId) Timestamp() time.Duration {
-    return time.Duration(twepoch+(id>>timestampLeftShift)) * time.Millisecond
+	return time.Duration(twepoch+(id>>timestampLeftShift)) * time.Millisecond
 }
 
 //将id转换为压缩SFStrId（string）类型
 func (id SFId) Compress() SFStrId {
-    return SFStrId(Compress2StringUL(int64(id)))
+	return SFStrId(Compress2StringUL(int64(id)))
 }
 
 //压缩SFStrId转换为string类型
 func (sid SFStrId) String() string {
-    return string(sid)
+	return string(sid)
 }
 
 //压缩SFStrId转换为SFId类型
 func (sid SFStrId) UnCompress() SFId {
-    return SFId(Uncompress2LongUL(string(sid)))
+	return SFId(Uncompress2LongUL(string(sid)))
 }
 
 //获得时间
 func (id SFId) Time() time.Time {
-    t := int64(id.Timestamp())
-    return time.Unix(0, t)
+	t := int64(id.Timestamp())
+	return time.Unix(0, t)
 }
 
 var compress_digit = []byte{
-    '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
-    'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J',
-    'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T',
-    'U', 'V', 'W', 'X', 'Y', 'Z',
+	'0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+	'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J',
+	'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T',
+	'U', 'V', 'W', 'X', 'Y', 'Z',
 }
 
 var uncompress_digit = []byte{
-    0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
-    0, 0, 0, 0, 0, 0, 0, //占位
-    10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
-    20, 21, 22, 23, 24, 25, 26, 27, 28, 29,
-    30, 31, 32, 33, 34, 35,
+	0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
+	0, 0, 0, 0, 0, 0, 0, //占位
+	10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
+	20, 21, 22, 23, 24, 25, 26, 27, 28, 29,
+	30, 31, 32, 33, 34, 35,
 }
 
 var compress_lower_digit = []byte{
-    '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
-    'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J',
-    'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T',
-    'U', 'V', 'W', 'X', 'Y', 'Z',
-    'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j',
-    'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't',
-    'u', 'v', 'w', 'x', 'y', 'z',
+	'0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+	'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J',
+	'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T',
+	'U', 'V', 'W', 'X', 'Y', 'Z',
+	'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j',
+	'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't',
+	'u', 'v', 'w', 'x', 'y', 'z',
 }
 
 var uncompress_lower_digit = []byte{
-    0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
-    0, 0, 0, 0, 0, 0, 0, //占位
-    10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
-    20, 21, 22, 23, 24, 25, 26, 27, 28, 29,
-    30, 31, 32, 33, 34, 35,
-    0, 0, 0, 0, 0, 0,
-    36, 37, 38, 39, 40, 41, 42, 43, 44, 45,
-    46, 47, 48, 49, 50, 51, 52, 53, 54, 55,
-    56, 57, 58, 59, 60, 61,
+	0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
+	0, 0, 0, 0, 0, 0, 0, //占位
+	10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
+	20, 21, 22, 23, 24, 25, 26, 27, 28, 29,
+	30, 31, 32, 33, 34, 35,
+	0, 0, 0, 0, 0, 0,
+	36, 37, 38, 39, 40, 41, 42, 43, 44, 45,
+	46, 47, 48, 49, 50, 51, 52, 53, 54, 55,
+	56, 57, 58, 59, 60, 61,
 }
 
 /**
 * 将id压缩成包含数字和字母的id，最多13位（69年）
 * @param idUtil
 * @return
-*/
+ */
 func innerCompress2String(compressDigit []byte, id int64) string {
-    return innerCompress2String2(compressDigit, id, 0)
+	return innerCompress2String2(compressDigit, id, 0)
 }
 
 /**
@@ -288,63 +288,63 @@ func innerCompress2String(compressDigit []byte, id int64) string {
 * @param idUtil
 * @param size
 * @return
-*/
+ */
 func innerCompress2String2(compressDigit []byte, id int64, size int) string {
-    //int64最大值为19位，如果compressDigit为2进制，则位数转换为 19*10/2 【19乘以（10进制/2进制）】=95，所以使用100足够满足需求
-    buf := make([]byte, 100)
-    var quotient, compl, old int64 = 0, 0, id
-    clen := int64(len(compressDigit))
-    index := len(buf) - 1
-    for {
-        quotient = old / clen
-        compl = old % clen
-        buf[index] = compressDigit[int(compl)]
-        index--
-        old = quotient
-        if quotient == 0 {
-            break
-        }
-    }
-    lenth := len(buf) - index - 1
-    for size > lenth {
-        size--
-        buf[index] = compressDigit[0]
-        index--
-    }
-    buf = buf[index+1:]
-    return string(buf)
+	//int64最大值为19位，如果compressDigit为2进制，则位数转换为 19*10/2 【19乘以（10进制/2进制）】=95，所以使用100足够满足需求
+	buf := make([]byte, 100)
+	var quotient, compl, old int64 = 0, 0, id
+	clen := int64(len(compressDigit))
+	index := len(buf) - 1
+	for {
+		quotient = old / clen
+		compl = old % clen
+		buf[index] = compressDigit[int(compl)]
+		index--
+		old = quotient
+		if quotient == 0 {
+			break
+		}
+	}
+	lenth := len(buf) - index - 1
+	for size > lenth {
+		size--
+		buf[index] = compressDigit[0]
+		index--
+	}
+	buf = buf[index+1:]
+	return string(buf)
 }
 
 /**
 * 将压缩的字符id转换为数字id
 * @param strId
 * @return
-*/
+ */
 func innerUncompress2Long(compressDigit []byte, uncompressDigit []byte, strId string) int64 {
-    strbyte := []byte(strId)
-    byteLen := len(strbyte)
-    cur := 1
-    var value int64 = 0
-    var mul int64 = 1
-    for {
-        v1 := int64(uncompressDigit[int(strbyte[byteLen-cur]-compressDigit[0])])
-        value += v1 * mul
-        mul *= int64(len(compressDigit))
-        if byteLen <= cur {
-            break
-        }
-        cur++
-    }
-    return value
+	strbyte := []byte(strId)
+	byteLen := len(strbyte)
+	cur := 1
+	var value int64 = 0
+	var mul int64 = 1
+	for {
+		v1 := int64(uncompressDigit[int(strbyte[byteLen-cur]-compressDigit[0])])
+		value += v1 * mul
+		mul *= int64(len(compressDigit))
+		if byteLen <= cur {
+			break
+		}
+		cur++
+	}
+	return value
 }
 
 /**
 * 将id压缩成包含数字和大写字母的id，最多13位（69年）
 * @param idUtil
 * @return
-*/
+ */
 func Compress2String(id int64) string {
-    return innerCompress2String(compress_digit, id)
+	return innerCompress2String(compress_digit, id)
 }
 
 /**
@@ -352,27 +352,27 @@ func Compress2String(id int64) string {
 * @param idUtil
 * @param size
 * @return
-*/
+ */
 func Compress2String2(id int64, size int) string {
-    return innerCompress2String2(compress_digit, id, size)
+	return innerCompress2String2(compress_digit, id, size)
 }
 
 /**
 * 将压缩的包含数字和大写字母的id转换为数字id
 * @param strId
 * @return
-*/
+ */
 func Uncompress2Long(strId string) int64 {
-    return innerUncompress2Long(compress_digit, uncompress_digit, strId)
+	return innerUncompress2Long(compress_digit, uncompress_digit, strId)
 }
 
 /**
 * 将id压缩成包含数字和大小写字母的id，最多11位（69年）
 * @param idUtil
 * @return
-*/
+ */
 func Compress2StringUL(id int64) string {
-    return innerCompress2String(compress_lower_digit, id)
+	return innerCompress2String(compress_lower_digit, id)
 }
 
 /**
@@ -380,16 +380,16 @@ func Compress2StringUL(id int64) string {
 * @param idUtil
 * @param size
 * @return
-*/
+ */
 func Compress2StringUL2(id int64, size int) string {
-    return innerCompress2String2(compress_lower_digit, id, size)
+	return innerCompress2String2(compress_lower_digit, id, size)
 }
 
 /**
 * 将压缩成包含数字和大小写字母的id转换为数字id
 * @param strId
 * @return
-*/
+ */
 func Uncompress2LongUL(strId string) int64 {
-    return innerUncompress2Long(compress_lower_digit, uncompress_lower_digit, strId)
+	return innerUncompress2Long(compress_lower_digit, uncompress_lower_digit, strId)
 }
