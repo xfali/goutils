@@ -48,13 +48,16 @@ type dataEntity struct {
 	expireTime time.Time
 }
 
+type DeleteNotifier func(key, value interface{})
+
 type defaultRecycleMap struct {
 	purgeInterval time.Duration
 	purgeNumber   int64
 
-	db   map[interface{}]*dataEntity
-	stop chan bool
-	lock sync.Locker
+	notifier DeleteNotifier
+	db       map[interface{}]*dataEntity
+	stop     chan bool
+	lock     sync.Locker
 }
 
 type Opt func(*defaultRecycleMap)
@@ -86,7 +89,7 @@ func (dm *defaultRecycleMap) purge() {
 			continue
 		}
 		if !v.expireTime.After(now) {
-			delete(dm.db, k)
+			dm.innerDelete(k, v.value)
 			i++
 			if i >= dm.purgeNumber {
 				return
@@ -162,6 +165,7 @@ func (dm *defaultRecycleMap) Get(key interface{}) interface{} {
 		}
 		now := time.Now()
 		if !v.expireTime.After(now) {
+			dm.innerDelete(key, v.value)
 			return nil
 		}
 		return v.value
@@ -177,12 +181,13 @@ func (dm *defaultRecycleMap) Size() int64 {
 
 	var size int64 = 0
 	now := time.Now()
-	for _, v := range dm.db {
+	for k, v := range dm.db {
 		if v.expireTime.IsZero() {
 			size++
 			continue
 		}
 		if !v.expireTime.After(now) {
+			dm.innerDelete(k, v.value)
 		} else {
 			size++
 		}
@@ -194,7 +199,21 @@ func (dm *defaultRecycleMap) Size() int64 {
 func (dm *defaultRecycleMap) Delete(key interface{}) {
 	dm.lock.Lock()
 	defer dm.lock.Unlock()
+
+	if v, ok := dm.db[key]; ok {
+		dm.innerDelete(key, v.value)
+	}
+}
+
+func (dm *defaultRecycleMap) innerDelete(key, value interface{}) {
 	delete(dm.db, key)
+	dm.notifyDelete(key, value)
+}
+
+func (dm *defaultRecycleMap) notifyDelete(key, value interface{}) {
+	if dm.notifier != nil {
+		dm.notifier(key, value)
+	}
 }
 
 //根据key设置key过期时间
@@ -244,6 +263,14 @@ func OptSetPurgeInterval(interval time.Duration) Opt {
 func OptSetPurgeNumberPerTime(number int64) Opt {
 	return func(recycleMap *defaultRecycleMap) {
 		recycleMap.purgeNumber = number
+	}
+}
+
+// 配置清理回调函数
+//
+func OptSetDeleteNotifier(notifier DeleteNotifier) Opt {
+	return func(recycleMap *defaultRecycleMap) {
+		recycleMap.notifier = notifier
 	}
 }
 

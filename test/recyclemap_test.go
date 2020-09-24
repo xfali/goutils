@@ -16,6 +16,17 @@ import (
 
 func TestRecycleMap(t *testing.T) {
 	dm := recycleMap.New()
+	test(dm, t)
+}
+
+func TestRecycleMapWithNotifier(t *testing.T) {
+	dm := recycleMap.New(recycleMap.OptSetDeleteNotifier(func(key, value interface{}) {
+		t.Logf(">>>>>>>>>>>>>>>> key deleted: %v , value: %v\n", key, value)
+	}))
+	test(dm, t)
+}
+
+func test(dm recycleMap.RecycleMap, t *testing.T) {
 	defer dm.Close()
 
 	dm.Set("123", "abc", 50*time.Millisecond)
@@ -82,10 +93,9 @@ func TestRecycleMap(t *testing.T) {
 		t.Fatal("must be nil")
 	}
 
-	time.Sleep(50*time.Millisecond)
+	time.Sleep(50 * time.Millisecond)
 	size = dm.Size()
 	if size != 0 {
 		t.Fatal("expect 3 but get ", size)
 	}
-
 }
