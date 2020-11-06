@@ -25,11 +25,11 @@ func (g *LinkedGraph) AddEdge(v interface{}, u interface{}) {
 	if _, ok := (*g)[v]; !ok {
 		(*g)[v] = linkedSet.New()
 	}
-	(*g)[v].PushBack(u, true)
+	(*g)[v].PushBack(u)
 	if _, ok := (*g)[u]; !ok {
 		(*g)[u] = linkedSet.New()
 	}
-	(*g)[u].PushBack(v, true)
+	(*g)[u].PushBack(v)
 }
 
 func (g *LinkedGraph) Len() int {
@@ -55,7 +55,7 @@ func (g *LinkedGraph) BFS(begin interface{}, visit func(interface{})) map[interf
 				queue.PushBack(c)
 				visit(c)
 			}
-			return false
+			return true
 		})
 	}
 	return dist
@@ -76,6 +76,6 @@ func (g *LinkedGraph) dfs_inner(begin interface{}, visit func(interface{}), visi
 			visit(i)
 			g.dfs_inner(i, visit, visited)
 		}
-		return false
+		return true
 	})
 }

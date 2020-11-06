@@ -21,22 +21,18 @@ func New() *LinkedSet {
 	return &LinkedSet{list.New(), make(map[interface{}]*list.Element)}
 }
 
-func (s *LinkedSet) PushBack(o interface{}, override bool) bool {
+func (s *LinkedSet) PushBack(o interface{}) bool {
 	if e, ok := s.m[o]; ok {
-		if override {
-			e.Value = o
-		}
+		e.Value = o
 		return true
 	}
 	s.m[o] = s.l.PushBack(o)
 	return false
 }
 
-func (s *LinkedSet) PushFront(o interface{}, override bool) bool {
+func (s *LinkedSet) PushFront(o interface{}) bool {
 	if e, ok := s.m[o]; ok {
-		if override {
-			e.Value = o
-		}
+		e.Value = o
 		return true
 	}
 	s.m[o] = s.l.PushFront(o)
@@ -84,7 +80,7 @@ func (s *LinkedSet) Len() int {
 
 func (s *LinkedSet) Foreach(f func(interface{}) bool) {
 	for e := s.l.Front(); e != nil; e = e.Next() {
-		if f(e.Value) {
+		if !f(e.Value) {
 			break
 		}
 	}
