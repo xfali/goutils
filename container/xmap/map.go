@@ -8,8 +8,7 @@ package xmap
 type Map interface {
 	// 向Map中添加一个元素
 	// Param：key 添加的对象key，value 添加的对象
-	// Return： 成功返回true，失败返回false
-	Put(key, value interface{}) bool
+	Put(key, value interface{})
 
 	// 尝试向Map中添加一个元素，如果已存在该元素则直接返回已存在元素不进行添加
 	// Param：key 添加的对象key，value 添加的对象

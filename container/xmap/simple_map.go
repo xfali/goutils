@@ -14,9 +14,8 @@ func NewSimple() *SimpleMap {
 // 向Map中添加一个元素
 // Param：key 添加的对象key，value 添加的对象
 // Return： 成功返回true，失败返回false
-func (m SimpleMap) Put(key, value interface{}) bool {
+func (m SimpleMap) Put(key, value interface{}) {
 	m[key] = value
-	return true
 }
 
 // 尝试向Map中添加一个元素，如果已存在该元素则直接返回已存在元素不进行添加
@@ -36,7 +35,10 @@ func (m SimpleMap) GetOrPut(key, value interface{}) (actual interface{}, loaded 
 // Return： value：key对应的对象，loaded：成功获取返回true，不存在返回false
 func (m SimpleMap) Get(key interface{}) (value interface{}, loaded bool) {
 	o, ok := m[key]
-	return o, ok
+	if ok {
+		return o, true
+	}
+	return nil, false
 }
 
 // 删除key对应的元素

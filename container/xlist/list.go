@@ -8,13 +8,11 @@ package xlist
 type List interface {
 	// 在链表尾部添加一个元素
 	// Param：o 添加的对象
-	// Return： 成功返回true，失败返回false
-	PushBack(o interface{}) bool
+	PushBack(o interface{})
 
 	// 在链表首部添加一个元素
 	// Param：o 添加的对象
-	// Return： 成功返回true，失败返回false
-	PushFront(o interface{}) bool
+	PushFront(o interface{})
 
 	// 删除元素
 	// Param：o 添加的对象

@@ -21,28 +21,24 @@ func New() *LinkedSet {
 	return &LinkedSet{list.New(), make(map[interface{}]*list.Element)}
 }
 
-func (s *LinkedSet) PushBack(o interface{}) bool {
+func (s *LinkedSet) PushBack(o interface{}) {
 	if e, ok := s.m[o]; ok {
 		e.Value = o
-		return true
 	}
 	s.m[o] = s.l.PushBack(o)
-	return false
 }
 
-func (s *LinkedSet) PushFront(o interface{}) bool {
+func (s *LinkedSet) PushFront(o interface{}) {
 	if e, ok := s.m[o]; ok {
 		e.Value = o
-		return true
 	}
 	s.m[o] = s.l.PushFront(o)
-	return false
 }
 
 func (s *LinkedSet) Remove(o interface{}) {
 	if e, ok := s.m[o]; ok {
 		s.l.Remove(e)
-		delete(s.m, e)
+		delete(s.m, o)
 	}
 }
 
