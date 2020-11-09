@@ -5,8 +5,6 @@
 
 package lru
 
-import "container/list"
-
 // history node
 type hnode struct {
 	hits int
@@ -23,47 +21,25 @@ func (n *hnode) clear() {
 }
 
 type LRUK struct {
-	m map[interface{}]*list.Element
+	m map[interface{}]*QueueElem
 	// history queue
-	hQueue *list.List
+	hQueue *LruQueue
 	// cache queue
-	cQueue *list.List
-
-	k         int
-	hQueueCap int
-	cQueueCap int
+	cQueue *SimpleLru
 }
 
 func NewLruKCache(k, historyCapacity, cacheCapacity int) *LRUK {
 	ret := &LRUK{
-		m:         map[interface{}]*list.Element{},
-		hQueue:    list.New(),
-		cQueue:    list.New(),
-		hQueueCap: historyCapacity,
-		cQueueCap: cacheCapacity,
-		k:         k,
+		m: map[interface{}]*QueueElem{},
 	}
+	ret.hQueue = NewLruQueue(historyCapacity)
+	ret.hQueue.AddListener(&historyListener{cache: ret, k: k})
+	ret.cQueue = NewLruCache(cacheCapacity)
 	return ret
 }
 
 func (m *LRUK) hit(key interface{}, hit bool) {
 
-}
-
-func (m *LRUK) insert(key interface{}, value interface{}) {
-	if m.Size()+1 > m.hQueueCap {
-		e := m.hQueue.Back()
-		if e != nil {
-			n := e.Value.(*hnode)
-			m.hQueue.Remove(e)
-			// not cache
-			if n.hits < m.k {
-				delete(m.m, e.Value.([2]interface{})[0])
-			}
-			n.clear()
-		}
-	}
-	m.m[key] = m.hQueue.PushFront(&hnode{k: key, v: value})
 }
 
 // 向Map中添加一个元素
@@ -73,9 +49,10 @@ func (m *LRUK) Put(key, value interface{}) {
 	if ok {
 		e.Value.(*hnode).clear()
 		e.Value = &hnode{k: key, v: value}
-		m.hQueue.MoveToFront(e)
+		m.hQueue.Touch(e)
 	} else {
-		m.insert(key, value)
+		elem := m.hQueue.Insert(&hnode{k: key, v: value})
+		m.m[key] = elem
 	}
 }
 
@@ -85,7 +62,7 @@ func (m *LRUK) Put(key, value interface{}) {
 func (m *LRUK) Get(key interface{}) (value interface{}, loaded bool) {
 	v, ok := m.m[key]
 	if ok {
-		m.hQueue.MoveToFront(v)
+		m.hQueue.Touch(v)
 		m.hit(key, true)
 		return v.Value.(*hnode).v, true
 	} else {
@@ -94,13 +71,17 @@ func (m *LRUK) Get(key interface{}) (value interface{}, loaded bool) {
 	}
 }
 
+func (m *LRUK) delete(k interface{}, v *QueueElem) {
+	m.cQueue.Delete(k)
+	m.hQueue.Delete(v)
+}
+
 // 删除key对应的元素
 // Param：key
 func (m *LRUK) Delete(key interface{}) {
 	v, ok := m.m[key]
 	if ok {
-		m.hQueue.Remove(v)
-		delete(m.m, key)
+		m.delete(key, v)
 	}
 }
 
@@ -108,4 +89,48 @@ func (m *LRUK) Delete(key interface{}) {
 // Return： 链表长度
 func (m *LRUK) Size() int {
 	return len(m.m)
+}
+
+type historyListener struct {
+	cache *LRUK
+	k     int
+}
+
+func (m *historyListener) PostTouch(v interface{}) {
+	n := v.(hnode)
+	n.hits++
+	if n.hits > m.k {
+		m.cache.cQueue.Put(n.k, nil)
+	}
+}
+
+func (m *historyListener) PostInsert(v interface{}) {
+}
+
+func (m *historyListener) PostDelete(v interface{}) {
+	n := v.(*hnode)
+	_, ok := m.cache.cQueue.Get(n.k)
+	if !ok {
+		delete(m.cache.m, n.k)
+	}
+	n.clear()
+}
+
+type cacheListener struct {
+	cache *LRUK
+}
+
+func (m *cacheListener) PostTouch(v interface{}) {
+}
+
+func (m *cacheListener) PostInsert(v interface{}) {
+}
+
+func (m *cacheListener) PostDelete(v interface{}) {
+	n := v.(*hnode)
+	_, ok := m.cache.cQueue.Get(n.k)
+	if !ok {
+		delete(m.cache.m, n.k)
+	}
+	n.clear()
 }

@@ -15,7 +15,7 @@ type LRU interface {
 
 type SimpleLru struct {
 	m     map[interface{}]*QueueElem
-	queue *Queue
+	queue *LruQueue
 
 	cap int
 }
@@ -25,7 +25,8 @@ func NewLruCache(capacity int) *SimpleLru {
 		m:   map[interface{}]*QueueElem{},
 		cap: capacity,
 	}
-	ret.queue = NewLruQueue(capacity, ret)
+	ret.queue = NewLruQueue(capacity)
+	ret.queue.AddListener(ret)
 	return ret
 }
 
