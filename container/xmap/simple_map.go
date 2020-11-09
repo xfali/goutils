@@ -7,7 +7,7 @@ package xmap
 
 type SimpleMap map[interface{}]interface{}
 
-func NewSimple() *SimpleMap {
+func NewSimpleMap() *SimpleMap {
 	return &SimpleMap{}
 }
 

@@ -11,8 +11,21 @@ import (
 )
 
 func TestMap(t *testing.T) {
-	m := xmap.NewSimple()
+	m := xmap.NewSimpleMap()
 	testMap(t, m)
+}
+
+func TestSimpleLinkedMap(t *testing.T) {
+	m := xmap.NewSimpleLinkedMap()
+	testMap(t, m)
+
+	m.Put(3, "c")
+	m.Foreach(func(key interface{}, value interface{}) bool {
+		if key.(int) != 1 || value.(string) != "a" {
+			t.Fatal("key ", key, " value ", value, "not match")
+		}
+		return false
+	})
 }
 
 func TestLinkedMap(t *testing.T) {
@@ -29,6 +42,10 @@ func TestLinkedMap(t *testing.T) {
 }
 
 func testMap(t *testing.T, m xmap.Map) {
+	if _, ok := m.Get(1) ; ok {
+		t.Fatal("key 2 have no value ")
+	}
+
 	m.Put(1, "a")
 	if _, ok := m.Get(2) ; ok {
 		t.Fatal("key 2 have no value ")
