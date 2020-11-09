@@ -6,7 +6,6 @@
 package lru
 
 import (
-	"container/list"
 	"github.com/xfali/goutils/container/xmap"
 )
 
@@ -15,34 +14,34 @@ type LRU interface {
 }
 
 type SimpleLru struct {
-	m map[interface{}]*list.Element
-	l *list.List
+	m     map[interface{}]*QueueElem
+	queue *Queue
 
 	cap int
 }
 
 func NewLruCache(capacity int) *SimpleLru {
 	ret := &SimpleLru{
-		m:   map[interface{}]*list.Element{},
-		l:   list.New(),
+		m:   map[interface{}]*QueueElem{},
 		cap: capacity,
 	}
+	ret.queue = NewLruQueue(capacity, ret)
 	return ret
+}
+
+func (m *SimpleLru) PostTouch(v interface{}) {
+}
+
+func (m *SimpleLru) PostInsert(v interface{}) {
+}
+
+func (m *SimpleLru) PostDelete(v interface{}) {
+	key := v.([2]interface{})[0]
+	delete(m.m, key)
 }
 
 func (m *SimpleLru) hit(key interface{}, hit bool) {
 
-}
-
-func (m *SimpleLru) insert(key interface{}, value interface{}) {
-	if m.Size()+1 > m.cap {
-		e := m.l.Back()
-		if e != nil {
-			m.l.Remove(e)
-			delete(m.m, e.Value.([2]interface{})[0])
-		}
-	}
-	m.m[key] = m.l.PushFront([2]interface{}{key, value})
 }
 
 // 向Map中添加一个元素
@@ -51,9 +50,10 @@ func (m *SimpleLru) Put(key, value interface{}) {
 	e, ok := m.m[key]
 	if ok {
 		e.Value = [2]interface{}{key, value}
-		m.l.MoveToFront(e)
+		m.queue.Touch(e)
 	} else {
-		m.insert(key, value)
+		elem := m.queue.Insert([2]interface{}{key, value})
+		m.m[key] = elem
 	}
 }
 
@@ -63,10 +63,12 @@ func (m *SimpleLru) Put(key, value interface{}) {
 func (m *SimpleLru) Get(key interface{}) (value interface{}, loaded bool) {
 	v, ok := m.m[key]
 	if ok {
-		m.l.MoveToFront(v)
+		m.queue.Touch(v)
+		// 命中
 		m.hit(key, true)
 		return v.Value.([2]interface{})[1], true
 	} else {
+		// 未命中
 		m.hit(key, false)
 		return nil, false
 	}
@@ -77,13 +79,12 @@ func (m *SimpleLru) Get(key interface{}) (value interface{}, loaded bool) {
 func (m *SimpleLru) Delete(key interface{}) {
 	v, ok := m.m[key]
 	if ok {
-		m.l.Remove(v)
-		delete(m.m, key)
+		m.queue.Delete(v)
 	}
 }
 
 // 获得Map长度
 // Return： 链表长度
 func (m *SimpleLru) Size() int {
-	return m.l.Len()
+	return len(m.m)
 }
