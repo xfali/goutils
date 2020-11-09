@@ -43,7 +43,7 @@ func TestLinkedMap(t *testing.T) {
 
 func testMap(t *testing.T, m xmap.Map) {
 	if _, ok := m.Get(1) ; ok {
-		t.Fatal("key 2 have no value ")
+		t.Fatal("key 1 have no value ")
 	}
 
 	m.Put(1, "a")
@@ -54,9 +54,9 @@ func testMap(t *testing.T, m xmap.Map) {
 		t.Fatal("not exits, v: ", v)
 	}
 
-	if !m.Find(1) {
-		t.Fatal("cannot find 1?")
-	}
+	//if !m.Find(1) {
+	//	t.Fatal("cannot find 1?")
+	//}
 
 	v, load := m.GetOrPut(1, "x")
 	if !load {
@@ -80,9 +80,9 @@ func testMap(t *testing.T, m xmap.Map) {
 	})
 
 	m.Delete(2)
-	if m.Find(2) {
-		t.Fatal("cannot find 2")
-	}
+	//if m.Find(2) {
+	//	t.Fatal("cannot find 2")
+	//}
 
 	if m.Size() != 1 {
 		t.Fatal("must 1 but: ", m.Size())
