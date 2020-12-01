@@ -11,6 +11,8 @@ import (
 
 type LRU interface {
 	xmap.IMap
+
+	Purge()
 }
 
 type SimpleLru struct {
@@ -43,6 +45,12 @@ func (m *SimpleLru) PostDelete(v interface{}) {
 
 func (m *SimpleLru) hit(key interface{}, hit bool) {
 
+}
+
+func (m *SimpleLru) Purge() {
+	m.queue.listeners = nil
+	m.queue.list = nil
+	m.queue = nil
 }
 
 // 向Map中添加一个元素
