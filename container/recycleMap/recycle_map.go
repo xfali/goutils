@@ -274,6 +274,14 @@ func OptSetDeleteNotifier(notifier DeleteNotifier) Opt {
 	}
 }
 
+// 配置锁
+//
+func OptSetLocker(locker sync.Locker) Opt {
+	return func(recycleMap *defaultRecycleMap) {
+		recycleMap.lock = locker
+	}
+}
+
 //开启事务
 func (dm *defaultRecycleMap) Multi() error {
 	//dm.Lock.Lock()
