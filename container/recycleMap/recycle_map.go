@@ -9,37 +9,49 @@
 package recycleMap
 
 import (
+	"fmt"
 	"math"
+	"reflect"
+	"regexp"
 	"runtime"
 	"sync"
 	"time"
 )
 
 const (
-	// 默认清理时间间隔
+	// DefaultPurgeInterval 默认清理时间间隔
 	DefaultPurgeInterval = 50 * time.Millisecond
-	// 默认每次清理个数
+
+	// DefaultPurgeNumberPerTime 默认每次清理个数
 	DefaultPurgeNumberPerTime = math.MaxInt64
 )
 
 type RecycleMap[K comparable, V any] interface {
-	//设置一个值，含过期时间
+	// Set 设置一个值，含过期时间
 	Set(key K, value V, expireIn time.Duration) error
 
-	//根据key获取value
+	// Get 根据key获取value
 	Get(key K) V
 
-	Delete(key K)
+	// Keys 获得所有匹配的key
+	Keys(pattern K) []K
 
-	//根据key设置key过期时间
+	// Delete 删除key
+	Delete(keys ...K) int64
+
+	// SetExpire 根据key设置key过期时间
 	SetExpire(key K, expireIn time.Duration) bool
 
-	//获得key过期时间
+	// TTL 获得key过期时间
 	TTL(key K) time.Duration
 
-	//获得总数
+	// Size 获得key总数
 	Size() int64
 
+	// Purge 回收过期key
+	Purge()
+
+	// Close 关闭并回收所有资源
 	Close() error
 }
 
@@ -54,6 +66,7 @@ type defaultRecycleMap[K comparable, V any] struct {
 	purgeInterval time.Duration
 	purgeNumber   int64
 
+	matcher  MatchFunc[K]
 	notifier DeleteNotifier[K, V]
 	db       map[K]*dataEntity[V]
 	stop     chan struct{}
@@ -61,12 +74,14 @@ type defaultRecycleMap[K comparable, V any] struct {
 }
 
 type Opt[K comparable, V any] func(*defaultRecycleMap[K, V])
+type MatchFunc[K comparable] func(pattern K) func(key K) (match bool)
 
 func New[K comparable, V any](opts ...Opt[K, V]) RecycleMap[K, V] {
 	ret := &defaultRecycleMap[K, V]{
 		purgeInterval: DefaultPurgeInterval,
 		purgeNumber:   DefaultPurgeNumberPerTime,
 		db:            map[K]*dataEntity[V]{},
+		matcher:       defaultMatch[K],
 		stop:          make(chan struct{}),
 		lock:          &sync.Mutex{},
 	}
@@ -78,7 +93,21 @@ func New[K comparable, V any](opts ...Opt[K, V]) RecycleMap[K, V] {
 	return ret
 }
 
-func (dm *defaultRecycleMap[K, V]) purge() {
+func (dm *defaultRecycleMap[K, V]) Keys(pattern K) []K {
+	dm.lock.Lock()
+	defer dm.lock.Unlock()
+
+	matcher := dm.matcher(pattern)
+	ret := make([]K, 0, len(dm.db))
+	for k := range dm.db {
+		if matcher(k) {
+			ret = append(ret, k)
+		}
+	}
+	return ret
+}
+
+func (dm *defaultRecycleMap[K, V]) Purge() {
 	dm.lock.Lock()
 	defer dm.lock.Unlock()
 
@@ -113,7 +142,7 @@ func (dm *defaultRecycleMap[K, V]) run() {
 				case <-dm.stop:
 					return
 				case <-timer.C:
-					dm.purge()
+					dm.Purge()
 				}
 			}
 		} else {
@@ -123,7 +152,7 @@ func (dm *defaultRecycleMap[K, V]) run() {
 					return
 				default:
 				}
-				dm.purge()
+				dm.Purge()
 
 				runtime.Gosched()
 			}
@@ -133,7 +162,12 @@ func (dm *defaultRecycleMap[K, V]) run() {
 
 // 关闭
 func (dm *defaultRecycleMap[K, V]) Close() error {
-	close(dm.stop)
+	select {
+	case <-dm.stop:
+		return nil
+	default:
+		close(dm.stop)
+	}
 	return nil
 }
 
@@ -198,13 +232,18 @@ func (dm *defaultRecycleMap[K, V]) Size() int64 {
 }
 
 // 删除key
-func (dm *defaultRecycleMap[K, V]) Delete(key K) {
+func (dm *defaultRecycleMap[K, V]) Delete(keys ...K) int64 {
 	dm.lock.Lock()
 	defer dm.lock.Unlock()
 
-	if v, ok := dm.db[key]; ok {
-		dm.innerDelete(key, v.value)
+	var total int64 = 0
+	for _, key := range keys {
+		if v, ok := dm.db[key]; ok {
+			dm.innerDelete(key, v.value)
+			total++
+		}
 	}
+	return total
 }
 
 func (dm *defaultRecycleMap[K, V]) innerDelete(key K, value V) {
@@ -252,7 +291,46 @@ func (dm *defaultRecycleMap[K, V]) TTL(key K) time.Duration {
 	}
 }
 
-// 配置清理时间间隔（默认50ms）
+func AllMatch[K comparable](pattern K) func(key K) (match bool) {
+	return func(key K) (match bool) {
+		return true
+	}
+}
+
+func defaultMatch[K comparable](pattern K) func(key K) (match bool) {
+	return func(key K) (match bool) {
+		defer func(ret *bool) {
+			if o := recover(); o != nil {
+				*ret = pattern == key
+			}
+		}(&match)
+		if v := reflect.ValueOf(pattern); v.IsZero() {
+			return true
+		}
+		return pattern == key
+	}
+}
+
+func RegexpMatcher[K comparable](converter func(v K) string) func(pattern K) func(key K) (match bool) {
+	if converter == nil {
+		converter = func(v K) string {
+			return fmt.Sprintf("%v", v)
+		}
+	}
+	return func(pattern K) func(key K) (match bool) {
+		reg, err := regexp.Compile(converter(pattern))
+		if err != nil {
+			return func(key K) (match bool) {
+				return false
+			}
+		}
+		return func(key K) (match bool) {
+			return reg.MatchString(converter(key))
+		}
+	}
+}
+
+// OptSetPurgeInterval 配置清理时间间隔（默认50ms）
 // 设置时间间隔越短清理得越及时，但是消耗更多CPU
 // 设置时间间隔越长内存消耗越多。
 func OptSetPurgeInterval[K comparable, V any](interval time.Duration) Opt[K, V] {
@@ -261,34 +339,41 @@ func OptSetPurgeInterval[K comparable, V any](interval time.Duration) Opt[K, V] 
 	}
 }
 
-// 配置每次清理的清理数量，如果超出则放到下次清理(默认全部清理)
+// OptSetPurgeNumberPerTime 配置每次清理的清理数量，如果超出则放到下次清理(默认全部清理)
 func OptSetPurgeNumberPerTime[K comparable, V any](number int64) Opt[K, V] {
 	return func(recycleMap *defaultRecycleMap[K, V]) {
 		recycleMap.purgeNumber = number
 	}
 }
 
-// 配置清理回调函数
+// OptSetDeleteNotifier 配置清理回调函数
 func OptSetDeleteNotifier[K comparable, V any](notifier DeleteNotifier[K, V]) Opt[K, V] {
 	return func(recycleMap *defaultRecycleMap[K, V]) {
 		recycleMap.notifier = notifier
 	}
 }
 
-// 配置锁
+// OptSetLocker 配置锁
 func OptSetLocker[K comparable, V any](locker sync.Locker) Opt[K, V] {
 	return func(recycleMap *defaultRecycleMap[K, V]) {
 		recycleMap.lock = locker
 	}
 }
 
-// 开启事务
+// OptSetMatcher 配置锁
+func OptSetMatcher[K comparable, V any](matcher MatchFunc[K]) Opt[K, V] {
+	return func(recycleMap *defaultRecycleMap[K, V]) {
+		recycleMap.matcher = matcher
+	}
+}
+
+// Multi 开启事务
 func (dm *defaultRecycleMap[K, V]) Multi() error {
 	//dm.Lock.Lock()
 	return nil
 }
 
-// 执行事务
+// Exec 执行事务
 func (dm *defaultRecycleMap[K, V]) Exec() error {
 	//dm.Lock.Unlock()
 	return nil

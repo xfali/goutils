@@ -10,13 +10,49 @@ package test
 
 import (
 	"github.com/xfali/goutils/v2/container/recycleMap"
+	"github.com/xfali/goutils/v2/pattern"
 	"testing"
 	"time"
 )
 
 func TestRecycleMap(t *testing.T) {
 	dm := recycleMap.New[string, string]()
-	test(dm, t)
+	t.Run("test", func(t *testing.T) {
+		test(dm, t)
+	})
+}
+
+func TestRecycleMapKeys(t *testing.T) {
+	t.Run("keys", func(t *testing.T) {
+		dm := recycleMap.New[string, string]()
+		dm.Set("aaabbbccc", "111222333", -1)
+		dm.Set("bbbaaaccc", "222111333", -1)
+		dm.Set("cccaaabbb", "333111222", -1)
+		keys := dm.Keys("")
+		for _, k := range keys {
+			t.Log("keys: ", k)
+		}
+	})
+
+	t.Run("keys regexp", func(t *testing.T) {
+		dm := recycleMap.New[string, string](
+			recycleMap.OptSetMatcher[string, string](recycleMap.RegexpMatcher(func(v string) string {
+				return v
+			})))
+		dm.Set("aaabbbccc", "111222333", -1)
+		dm.Set("bbbaaaccc", "222111333", -1)
+		dm.Set("cccaaabbb", "333111222", -1)
+		keys := dm.Keys(pattern.StartWith("aaa"))
+		for _, k := range keys {
+			t.Log("keys: ", k)
+		}
+		if len(keys) != 1 {
+			t.Fatal("expect 1 but get ", len(keys))
+		}
+		if keys[0] != "aaabbbccc" {
+			t.Fatal("expect aaabbbccc but get ", keys[0])
+		}
+	})
 }
 
 func TestRecycleMapWithNotifier(t *testing.T) {
@@ -32,6 +68,11 @@ func test(dm recycleMap.RecycleMap[string, string], t *testing.T) {
 	dm.Set("123", "abc", 50*time.Millisecond)
 	dm.Set("456", "efg", -1)
 	dm.Set("789", "hij", -1)
+
+	keys := dm.Keys("")
+	for _, k := range keys {
+		t.Log("keys: ", k)
+	}
 
 	v1 := dm.Get("123")
 	if v1 != "abc" {
