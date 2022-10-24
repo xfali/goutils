@@ -10,17 +10,17 @@ package recycleMap
 
 import (
 	"fmt"
+	"github.com/xfali/goutils/v2/container/purger"
 	"math"
 	"reflect"
 	"regexp"
-	"runtime"
 	"sync"
 	"time"
 )
 
 const (
 	// DefaultPurgeInterval 默认清理时间间隔
-	DefaultPurgeInterval = 50 * time.Millisecond
+	DefaultPurgeInterval = 250 * time.Millisecond
 
 	// DefaultPurgeNumberPerTime 默认每次清理个数
 	DefaultPurgeNumberPerTime = math.MaxInt64
@@ -55,6 +55,12 @@ type RecycleMap[K comparable, V any] interface {
 	Close() error
 }
 
+var globalPurgeExecutor = purger.New()
+
+func StopGlobalPurgeExecutor() {
+	_ = globalPurgeExecutor.Close()
+}
+
 type dataEntity[V any] struct {
 	value      V
 	expireTime time.Time
@@ -65,11 +71,11 @@ type DeleteNotifier[K comparable, V any] func(key K, value V)
 type defaultRecycleMap[K comparable, V any] struct {
 	purgeInterval time.Duration
 	purgeNumber   int64
+	manualPurge   bool
 
 	matcher  MatchFunc[K]
 	notifier DeleteNotifier[K, V]
 	db       map[K]*dataEntity[V]
-	stop     chan struct{}
 	lock     sync.Locker
 }
 
@@ -82,14 +88,16 @@ func New[K comparable, V any](opts ...Opt[K, V]) RecycleMap[K, V] {
 		purgeNumber:   DefaultPurgeNumberPerTime,
 		db:            map[K]*dataEntity[V]{},
 		matcher:       defaultMatch[K],
-		stop:          make(chan struct{}),
 		lock:          &sync.Mutex{},
 	}
 	for _, opt := range opts {
 		opt(ret)
 	}
 
-	ret.run()
+	if !ret.manualPurge {
+		globalPurgeExecutor.AddPurger(ret, ret.purgeInterval)
+	}
+
 	return ret
 }
 
@@ -127,47 +135,9 @@ func (dm *defaultRecycleMap[K, V]) Purge() {
 	}
 }
 
-// 初始化并开启回收线程，必须调用
-func (dm *defaultRecycleMap[K, V]) run() {
-	if dm.purgeInterval <= 0 {
-		dm.purgeInterval = 0
-	}
-
-	go func() {
-		if dm.purgeInterval > 0 {
-			timer := time.NewTicker(dm.purgeInterval)
-			defer timer.Stop()
-			for {
-				select {
-				case <-dm.stop:
-					return
-				case <-timer.C:
-					dm.Purge()
-				}
-			}
-		} else {
-			for {
-				select {
-				case <-dm.stop:
-					return
-				default:
-				}
-				dm.Purge()
-
-				runtime.Gosched()
-			}
-		}
-	}()
-}
-
 // 关闭
 func (dm *defaultRecycleMap[K, V]) Close() error {
-	select {
-	case <-dm.stop:
-		return nil
-	default:
-		close(dm.stop)
-	}
+	dm.Purge()
 	return nil
 }
 
@@ -327,6 +297,26 @@ func RegexpMatcher[K comparable](converter func(v K) string) func(pattern K) fun
 		return func(key K) (match bool) {
 			return reg.MatchString(converter(key))
 		}
+	}
+}
+
+// OptManualPurge 配置手工清理，注意过期key将不再自动清理，但是还是会触发被动清理
+func OptManualPurge[K comparable, V any]() Opt[K, V] {
+	return func(recycleMap *defaultRecycleMap[K, V]) {
+		recycleMap.manualPurge = true
+	}
+}
+
+// OptAutoPurge 配置清理时间间隔
+// 设置时间间隔越短清理得越及时，但是消耗更多CPU
+// 设置时间间隔越长内存消耗越多。
+func OptAutoPurge[K comparable, V any](interval time.Duration, executor purger.PurgeExecutor) Opt[K, V] {
+	return func(recycleMap *defaultRecycleMap[K, V]) {
+		if executor == nil {
+			executor = globalPurgeExecutor
+		}
+		recycleMap.manualPurge = true
+		executor.AddPurger(recycleMap, interval)
 	}
 }
 

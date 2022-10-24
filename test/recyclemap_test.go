@@ -84,13 +84,15 @@ func test(dm recycleMap.RecycleMap[string, string], t *testing.T) {
 		t.Fatal("expect 3 but get ", size)
 	}
 
-	time.Sleep(50 * time.Millisecond)
-
+	time.Sleep(2 * time.Second)
+	if dm.Size() != 2 {
+		t.Fatal("expect 2 but get ", dm.Size())
+	}
 	v2 := dm.Get("123")
 	if v2 != "" {
 		t.Fatalf("v2 must be nil, %d\n", dm.TTL("123")/time.Millisecond)
 	}
-	t.Logf("After 1 second value is %v\n", v2)
+	t.Logf("After 2 second value is %v\n", v2)
 	size = dm.Size()
 	if size != 2 {
 		t.Fatal("expect 3 but get ", size)
