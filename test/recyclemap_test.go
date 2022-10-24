@@ -11,6 +11,7 @@ package test
 import (
 	"github.com/xfali/goutils/v2/container/recycleMap"
 	"github.com/xfali/goutils/v2/pattern"
+	"sync"
 	"testing"
 	"time"
 )
@@ -56,10 +57,34 @@ func TestRecycleMapKeys(t *testing.T) {
 }
 
 func TestRecycleMapWithNotifier(t *testing.T) {
-	dm := recycleMap.New(recycleMap.OptSetDeleteNotifier(func(key, value string) {
-		t.Logf(">>>>>>>>>>>>>>>> key deleted: %v , value: %v\n", key, value)
-	}))
-	test(dm, t)
+	t.Run("1 map", func(t *testing.T) {
+		dm := recycleMap.New(recycleMap.OptSetDeleteNotifier(func(key, value string) {
+			t.Logf(">>>>>>>>>>>>>>>> key deleted: %v , value: %v\n", key, value)
+		}))
+		test(dm, t)
+	})
+
+	t.Run("multi map", func(t *testing.T) {
+		total := 10
+		wait := sync.WaitGroup{}
+
+		dms := make([]recycleMap.RecycleMap[string, string], total)
+		for i := 0; i < total; i++ {
+			dm := recycleMap.New(recycleMap.OptSetDeleteNotifier(func(key, value string) {
+				t.Logf(">>>>>>>>>>>>>>>> key deleted: %v , value: %v\n", key, value)
+			}))
+			dms[i] = dm
+			wait.Add(1)
+		}
+		for i := range dms {
+			dm := dms[i]
+			go func() {
+				defer wait.Done()
+				test(dm, t)
+			}()
+		}
+		wait.Wait()
+	})
 }
 
 func test(dm recycleMap.RecycleMap[string, string], t *testing.T) {

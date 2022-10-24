@@ -17,6 +17,7 @@
 package purger
 
 import (
+	"fmt"
 	"github.com/xfali/timewheel"
 	"sync"
 	"time"
@@ -32,7 +33,7 @@ type Purger interface {
 type PurgeExecutor interface {
 	// AddPurger 添加清理器到清理执行器
 	// purger为清理器，到interval时间间隔之后会自动调用清理器的Purge方法进行清理
-	AddPurger(purger Purger, interval time.Duration) bool
+	AddPurger(purger Purger, interval time.Duration) error
 
 	// Close 关闭清理执行器，关闭时会自动调用所有清理器再执行一次清理
 	Close() error
@@ -63,19 +64,19 @@ func New(opts ...opt) *defaultExecutor {
 	return ret
 }
 
-func (e *defaultExecutor) AddPurger(purger Purger, interval time.Duration) bool {
+func (e *defaultExecutor) AddPurger(purger Purger, interval time.Duration) error {
 	e.lock.Lock()
 	defer e.lock.Unlock()
 
 	if _, ok := e.purgers[purger]; ok {
-		return false
+		return fmt.Errorf("Purger has been added to executor ")
 	}
 	_, err := e.tw.Add(purger.Purge, interval, true)
 	if err != nil {
-		return false
+		return err
 	}
 	e.purgers[purger] = struct{}{}
-	return true
+	return nil
 }
 
 func (e *defaultExecutor) Close() error {
