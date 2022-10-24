@@ -1,3 +1,3 @@
-module github.com/xfali/goutils
+module github.com/xfali/goutils/v2
 
-go 1.12
+go 1.18

@@ -6,7 +6,7 @@
 package test
 
 import (
-	"github.com/xfali/goutils/container/sortmap"
+	"github.com/xfali/goutils/v2/container/sortmap"
 	"testing"
 	"time"
 )

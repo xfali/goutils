@@ -6,7 +6,7 @@
 package test
 
 import (
-	"github.com/xfali/goutils/container/xmap"
+	"github.com/xfali/goutils/v2/container/xmap"
 	"testing"
 )
 
@@ -42,15 +42,15 @@ func TestLinkedMap(t *testing.T) {
 }
 
 func testMap(t *testing.T, m xmap.Map) {
-	if _, ok := m.Get(1) ; ok {
+	if _, ok := m.Get(1); ok {
 		t.Fatal("key 1 have no value ")
 	}
 
 	m.Put(1, "a")
-	if _, ok := m.Get(2) ; ok {
+	if _, ok := m.Get(2); ok {
 		t.Fatal("key 2 have no value ")
 	}
-	if v, ok := m.Get(1) ; !ok || v.(string) != "a" {
+	if v, ok := m.Get(1); !ok || v.(string) != "a" {
 		t.Fatal("not exits, v: ", v)
 	}
 

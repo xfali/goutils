@@ -22,20 +22,20 @@ const (
 	DefaultPurgeNumberPerTime = math.MaxInt64
 )
 
-type RecycleMap interface {
+type RecycleMap[K comparable, V any] interface {
 	//设置一个值，含过期时间
-	Set(key, value interface{}, expireIn time.Duration) error
+	Set(key K, value V, expireIn time.Duration) error
 
 	//根据key获取value
-	Get(key interface{}) interface{}
+	Get(key K) V
 
-	Delete(key interface{})
+	Delete(key K)
 
 	//根据key设置key过期时间
-	SetExpire(key interface{}, expireIn time.Duration) bool
+	SetExpire(key K, expireIn time.Duration) bool
 
 	//获得key过期时间
-	TTL(key interface{}) time.Duration
+	TTL(key K) time.Duration
 
 	//获得总数
 	Size() int64
@@ -43,31 +43,31 @@ type RecycleMap interface {
 	Close() error
 }
 
-type dataEntity struct {
-	value      interface{}
+type dataEntity[V any] struct {
+	value      V
 	expireTime time.Time
 }
 
-type DeleteNotifier func(key, value interface{})
+type DeleteNotifier[K comparable, V any] func(key K, value V)
 
-type defaultRecycleMap struct {
+type defaultRecycleMap[K comparable, V any] struct {
 	purgeInterval time.Duration
 	purgeNumber   int64
 
-	notifier DeleteNotifier
-	db       map[interface{}]*dataEntity
-	stop     chan bool
+	notifier DeleteNotifier[K, V]
+	db       map[K]*dataEntity[V]
+	stop     chan struct{}
 	lock     sync.Locker
 }
 
-type Opt func(*defaultRecycleMap)
+type Opt[K comparable, V any] func(*defaultRecycleMap[K, V])
 
-func New(opts ...Opt) RecycleMap {
-	ret := &defaultRecycleMap{
+func New[K comparable, V any](opts ...Opt[K, V]) RecycleMap[K, V] {
+	ret := &defaultRecycleMap[K, V]{
 		purgeInterval: DefaultPurgeInterval,
 		purgeNumber:   DefaultPurgeNumberPerTime,
-		db:            map[interface{}]*dataEntity{},
-		stop:          make(chan bool),
+		db:            map[K]*dataEntity[V]{},
+		stop:          make(chan struct{}),
 		lock:          &sync.Mutex{},
 	}
 	for _, opt := range opts {
@@ -78,7 +78,7 @@ func New(opts ...Opt) RecycleMap {
 	return ret
 }
 
-func (dm *defaultRecycleMap) purge() {
+func (dm *defaultRecycleMap[K, V]) purge() {
 	dm.lock.Lock()
 	defer dm.lock.Unlock()
 
@@ -98,8 +98,8 @@ func (dm *defaultRecycleMap) purge() {
 	}
 }
 
-//初始化并开启回收线程，必须调用
-func (dm *defaultRecycleMap) run() {
+// 初始化并开启回收线程，必须调用
+func (dm *defaultRecycleMap[K, V]) run() {
 	if dm.purgeInterval <= 0 {
 		dm.purgeInterval = 0
 	}
@@ -131,29 +131,29 @@ func (dm *defaultRecycleMap) run() {
 	}()
 }
 
-//关闭
-func (dm *defaultRecycleMap) Close() error {
+// 关闭
+func (dm *defaultRecycleMap[K, V]) Close() error {
 	close(dm.stop)
 	return nil
 }
 
 // 设置一个值，含过期时间
 // 如果expireIn设置为-1，则永不过期
-func (dm *defaultRecycleMap) Set(key, value interface{}, expireIn time.Duration) error {
+func (dm *defaultRecycleMap[K, V]) Set(key K, value V, expireIn time.Duration) error {
 	dm.lock.Lock()
 	defer dm.lock.Unlock()
 
 	if expireIn >= 0 {
-		dm.db[key] = &dataEntity{value: value, expireTime: time.Now().Add(expireIn)}
+		dm.db[key] = &dataEntity[V]{value: value, expireTime: time.Now().Add(expireIn)}
 	} else {
-		dm.db[key] = &dataEntity{value: value}
+		dm.db[key] = &dataEntity[V]{value: value}
 	}
 
 	return nil
 }
 
-//根据key获取value
-func (dm *defaultRecycleMap) Get(key interface{}) interface{} {
+// 根据key获取value
+func (dm *defaultRecycleMap[K, V]) Get(key K) V {
 	dm.lock.Lock()
 	defer dm.lock.Unlock()
 
@@ -166,16 +166,18 @@ func (dm *defaultRecycleMap) Get(key interface{}) interface{} {
 		now := time.Now()
 		if !v.expireTime.After(now) {
 			dm.innerDelete(key, v.value)
-			return nil
+			var v V
+			return v
 		}
 		return v.value
 	} else {
-		return nil
+		var v V
+		return v
 	}
 }
 
-//获得总数
-func (dm *defaultRecycleMap) Size() int64 {
+// 获得总数
+func (dm *defaultRecycleMap[K, V]) Size() int64 {
 	dm.lock.Lock()
 	dm.lock.Unlock()
 
@@ -195,8 +197,8 @@ func (dm *defaultRecycleMap) Size() int64 {
 	return size
 }
 
-//删除key
-func (dm *defaultRecycleMap) Delete(key interface{}) {
+// 删除key
+func (dm *defaultRecycleMap[K, V]) Delete(key K) {
 	dm.lock.Lock()
 	defer dm.lock.Unlock()
 
@@ -205,19 +207,19 @@ func (dm *defaultRecycleMap) Delete(key interface{}) {
 	}
 }
 
-func (dm *defaultRecycleMap) innerDelete(key, value interface{}) {
+func (dm *defaultRecycleMap[K, V]) innerDelete(key K, value V) {
 	delete(dm.db, key)
 	dm.notifyDelete(key, value)
 }
 
-func (dm *defaultRecycleMap) notifyDelete(key, value interface{}) {
+func (dm *defaultRecycleMap[K, V]) notifyDelete(key K, value V) {
 	if dm.notifier != nil {
 		dm.notifier(key, value)
 	}
 }
 
-//根据key设置key过期时间
-func (dm *defaultRecycleMap) SetExpire(key interface{}, expireIn time.Duration) bool {
+// 根据key设置key过期时间
+func (dm *defaultRecycleMap[K, V]) SetExpire(key K, expireIn time.Duration) bool {
 	dm.lock.Lock()
 	defer dm.lock.Unlock()
 
@@ -234,8 +236,8 @@ func (dm *defaultRecycleMap) SetExpire(key interface{}, expireIn time.Duration) 
 	}
 }
 
-//获得key过期时间, 如果不存在返回-2，如果永不过期返回-1
-func (dm *defaultRecycleMap) TTL(key interface{}) time.Duration {
+// 获得key过期时间, 如果不存在返回-2，如果永不过期返回-1
+func (dm *defaultRecycleMap[K, V]) TTL(key K) time.Duration {
 	dm.lock.Lock()
 	defer dm.lock.Unlock()
 
@@ -253,43 +255,41 @@ func (dm *defaultRecycleMap) TTL(key interface{}) time.Duration {
 // 配置清理时间间隔（默认50ms）
 // 设置时间间隔越短清理得越及时，但是消耗更多CPU
 // 设置时间间隔越长内存消耗越多。
-func OptSetPurgeInterval(interval time.Duration) Opt {
-	return func(recycleMap *defaultRecycleMap) {
+func OptSetPurgeInterval[K comparable, V any](interval time.Duration) Opt[K, V] {
+	return func(recycleMap *defaultRecycleMap[K, V]) {
 		recycleMap.purgeInterval = interval
 	}
 }
 
 // 配置每次清理的清理数量，如果超出则放到下次清理(默认全部清理)
-func OptSetPurgeNumberPerTime(number int64) Opt {
-	return func(recycleMap *defaultRecycleMap) {
+func OptSetPurgeNumberPerTime[K comparable, V any](number int64) Opt[K, V] {
+	return func(recycleMap *defaultRecycleMap[K, V]) {
 		recycleMap.purgeNumber = number
 	}
 }
 
 // 配置清理回调函数
-//
-func OptSetDeleteNotifier(notifier DeleteNotifier) Opt {
-	return func(recycleMap *defaultRecycleMap) {
+func OptSetDeleteNotifier[K comparable, V any](notifier DeleteNotifier[K, V]) Opt[K, V] {
+	return func(recycleMap *defaultRecycleMap[K, V]) {
 		recycleMap.notifier = notifier
 	}
 }
 
 // 配置锁
-//
-func OptSetLocker(locker sync.Locker) Opt {
-	return func(recycleMap *defaultRecycleMap) {
+func OptSetLocker[K comparable, V any](locker sync.Locker) Opt[K, V] {
+	return func(recycleMap *defaultRecycleMap[K, V]) {
 		recycleMap.lock = locker
 	}
 }
 
-//开启事务
-func (dm *defaultRecycleMap) Multi() error {
+// 开启事务
+func (dm *defaultRecycleMap[K, V]) Multi() error {
 	//dm.Lock.Lock()
 	return nil
 }
 
-//执行事务
-func (dm *defaultRecycleMap) Exec() error {
+// 执行事务
+func (dm *defaultRecycleMap[K, V]) Exec() error {
 	//dm.Lock.Unlock()
 	return nil
 }

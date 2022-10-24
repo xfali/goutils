@@ -9,24 +9,24 @@
 package test
 
 import (
-	"github.com/xfali/goutils/container/recycleMap"
+	"github.com/xfali/goutils/v2/container/recycleMap"
 	"testing"
 	"time"
 )
 
 func TestRecycleMap(t *testing.T) {
-	dm := recycleMap.New()
+	dm := recycleMap.New[string, string]()
 	test(dm, t)
 }
 
 func TestRecycleMapWithNotifier(t *testing.T) {
-	dm := recycleMap.New(recycleMap.OptSetDeleteNotifier(func(key, value interface{}) {
+	dm := recycleMap.New(recycleMap.OptSetDeleteNotifier(func(key, value string) {
 		t.Logf(">>>>>>>>>>>>>>>> key deleted: %v , value: %v\n", key, value)
 	}))
 	test(dm, t)
 }
 
-func test(dm recycleMap.RecycleMap, t *testing.T) {
+func test(dm recycleMap.RecycleMap[string, string], t *testing.T) {
 	defer dm.Close()
 
 	dm.Set("123", "abc", 50*time.Millisecond)
@@ -34,7 +34,7 @@ func test(dm recycleMap.RecycleMap, t *testing.T) {
 	dm.Set("789", "hij", -1)
 
 	v1 := dm.Get("123")
-	if v1.(string) != "abc" {
+	if v1 != "abc" {
 		t.Fatal("must be abc")
 	}
 	t.Logf("value is %v, ttl: %d\n", v1, dm.TTL("123")/time.Millisecond)
@@ -46,7 +46,7 @@ func test(dm recycleMap.RecycleMap, t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 
 	v2 := dm.Get("123")
-	if v2 != nil {
+	if v2 != "" {
 		t.Fatalf("v2 must be nil, %d\n", dm.TTL("123")/time.Millisecond)
 	}
 	t.Logf("After 1 second value is %v\n", v2)
@@ -58,13 +58,13 @@ func test(dm recycleMap.RecycleMap, t *testing.T) {
 	time.Sleep(time.Millisecond)
 
 	v3 := dm.Get("123")
-	if v3 != nil {
+	if v3 != "" {
 		t.Fatalf("v2 must be nil, %d\n", dm.TTL("123")/time.Millisecond)
 	}
 	t.Logf("After 1 second 1 Millisecond value is %v\n", v3)
 
 	v4 := dm.Get("456")
-	if v4.(string) != "efg" {
+	if v4 != "efg" {
 		t.Fatal("must be efg")
 	}
 	t.Log(v4, dm.TTL("456"))
@@ -73,7 +73,7 @@ func test(dm recycleMap.RecycleMap, t *testing.T) {
 	t.Log(dm.TTL("456"))
 	time.Sleep(50 * time.Millisecond)
 	v5 := dm.Get("456")
-	if v5 != nil {
+	if v5 != "" {
 		t.Fatal("must be nil")
 	}
 	size = dm.Size()
@@ -82,14 +82,14 @@ func test(dm recycleMap.RecycleMap, t *testing.T) {
 	}
 
 	v6 := dm.Get("789")
-	if v6.(string) != "hij" {
+	if v6 != "hij" {
 		t.Fatal("must be hij")
 	} else {
 		t.Log(v6)
 	}
 
 	dm.Delete("789")
-	if dm.Get("789") != nil {
+	if dm.Get("789") != "" {
 		t.Fatal("must be nil")
 	}
 

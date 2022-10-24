@@ -2,7 +2,7 @@ package test
 
 import (
 	"fmt"
-	"github.com/xfali/goutils/container/mapGraph"
+	"github.com/xfali/goutils/v2/container/mapGraph"
 	"testing"
 )
 

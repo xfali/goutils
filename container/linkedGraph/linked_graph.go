@@ -12,7 +12,7 @@ package linkedGraph
 
 import (
 	"container/list"
-	"github.com/xfali/goutils/container/linkedSet"
+	"github.com/xfali/goutils/v2/container/linkedSet"
 )
 
 type LinkedGraph map[interface{}]*linkedSet.LinkedSet

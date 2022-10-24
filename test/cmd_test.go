@@ -6,7 +6,7 @@
 package test
 
 import (
-	"github.com/xfali/goutils/cmd"
+	"github.com/xfali/goutils/v2/cmd"
 	"testing"
 )
 

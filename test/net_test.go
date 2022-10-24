@@ -9,7 +9,7 @@
 package test
 
 import (
-	"github.com/xfali/goutils/net"
+	"github.com/xfali/goutils/v2/net"
 	"testing"
 )
 

@@ -11,7 +11,7 @@ package test
 import (
 	"container/list"
 	"fmt"
-	"github.com/xfali/goutils/idUtil"
+	"github.com/xfali/goutils/v2/idUtil"
 	"testing"
 	"time"
 )

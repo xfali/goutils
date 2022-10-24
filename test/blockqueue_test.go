@@ -12,7 +12,7 @@ package test
 
 import (
 	"fmt"
-	"github.com/xfali/goutils/container"
+	"github.com/xfali/goutils/v2/container"
 	"testing"
 	"time"
 )

@@ -7,7 +7,7 @@
 package test
 
 import (
-	"github.com/xfali/goutils/log"
+	"github.com/xfali/goutils/v2/log"
 	"testing"
 	"time"
 )

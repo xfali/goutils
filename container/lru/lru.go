@@ -6,7 +6,7 @@
 package lru
 
 import (
-	"github.com/xfali/goutils/container/xmap"
+	"github.com/xfali/goutils/v2/container/xmap"
 )
 
 type LRU interface {

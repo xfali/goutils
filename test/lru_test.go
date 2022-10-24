@@ -6,7 +6,7 @@
 package test
 
 import (
-	"github.com/xfali/goutils/container/lru"
+	"github.com/xfali/goutils/v2/container/lru"
 	"testing"
 )
 

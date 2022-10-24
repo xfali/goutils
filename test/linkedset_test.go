@@ -6,8 +6,8 @@
 package test
 
 import (
-	"github.com/xfali/goutils/container/linkedSet"
-	"github.com/xfali/goutils/container/xlist"
+	"github.com/xfali/goutils/v2/container/linkedSet"
+	"github.com/xfali/goutils/v2/container/xlist"
 	"testing"
 )
 

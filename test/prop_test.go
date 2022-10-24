@@ -6,7 +6,7 @@
 package test
 
 import (
-	"github.com/xfali/goutils/prop"
+	"github.com/xfali/goutils/v2/prop"
 	"testing"
 )
 
