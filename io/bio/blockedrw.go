@@ -19,8 +19,10 @@ package bio
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"io"
+	"time"
 )
 
 type ReaderFactory func([]byte) io.Reader
@@ -37,6 +39,9 @@ type blockReadWriter struct {
 	r    io.Reader
 	rf   ReaderFactory
 	pool Pool
+
+	readTimeout  time.Duration
+	writeTimeout time.Duration
 }
 
 func NewBlockReadWriter(opts ...brwOpt) *blockReadWriter {
@@ -70,7 +75,22 @@ func (rw *blockReadWriter) Read(d []byte) (int, error) {
 				d = d[rn:]
 			}
 		}
-		r, ok := <-rw.ch
+		var (
+			r  io.Reader
+			ok bool
+		)
+		if rw.readTimeout > 0 {
+			ctx, _ := context.WithTimeout(context.Background(), rw.readTimeout)
+			select {
+			case <-ctx.Done():
+				return total, errors.New("Read timeout ")
+			case r, ok = <-rw.ch:
+				break
+			}
+		} else {
+			r, ok = <-rw.ch
+		}
+
 		if !ok {
 			return total, io.EOF
 		}
@@ -82,17 +102,38 @@ func (rw *blockReadWriter) Write(d []byte) (int, error) {
 	if len(d) == 0 {
 		return 0, nil
 	}
+	var (
+		r   io.Reader
+		n   int
+		err error
+	)
 	if rw.pool != nil {
 		v := rw.pool.Get().(io.ReadWriter)
-		n, err := v.Write(d)
-		rw.ch <- v
-		return n, err
+		n, err = v.Write(d)
+		if err != nil {
+			return n, err
+		}
+		r = v
 	} else if rw.rf != nil {
-		rw.ch <- rw.rf(d)
+		r = rw.rf(d)
+		n = len(d)
 	} else {
-		rw.ch <- bytes.NewReader(d)
+		r = bytes.NewReader(d)
+		n = len(d)
 	}
-	return len(d), nil
+
+	if rw.writeTimeout > 0 {
+		ctx, _ := context.WithTimeout(context.Background(), rw.writeTimeout)
+		select {
+		case <-ctx.Done():
+			return 0, errors.New("Write timeout ")
+		case rw.ch <- r:
+			break
+		}
+	} else {
+		rw.ch <- r
+	}
+	return n, err
 }
 
 func (rw *blockReadWriter) Close() error {
@@ -118,5 +159,17 @@ func (o brwOpts) WithReaderFactory(rf ReaderFactory) brwOpt {
 func (o brwOpts) WithPool(p Pool) brwOpt {
 	return func(writer *blockReadWriter) {
 		writer.pool = p
+	}
+}
+
+func (o brwOpts) WithReadTimeout(t time.Duration) brwOpt {
+	return func(writer *blockReadWriter) {
+		writer.readTimeout = t
+	}
+}
+
+func (o brwOpts) WithWriteTimeout(t time.Duration) brwOpt {
+	return func(writer *blockReadWriter) {
+		writer.writeTimeout = t
 	}
 }
