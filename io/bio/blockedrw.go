@@ -21,22 +21,26 @@ import (
 	"bytes"
 	"errors"
 	"io"
-	"sync"
 )
 
 type ReaderFactory func([]byte) io.Reader
 
-type brwOpt func(*blockedReadWriter)
+type brwOpt func(*blockReadWriter)
 
-type blockedReadWriter struct {
+type Pool interface {
+	Put(x any)
+	Get() any
+}
+
+type blockReadWriter struct {
 	ch   chan io.Reader
 	r    io.Reader
 	rf   ReaderFactory
-	pool *sync.Pool
+	pool Pool
 }
 
-func NewBlockedReadWriter(opts ...brwOpt) *blockedReadWriter {
-	ret := &blockedReadWriter{
+func NewBlockReadWriter(opts ...brwOpt) *blockReadWriter {
+	ret := &blockReadWriter{
 		ch: make(chan io.Reader),
 	}
 	for _, opt := range opts {
@@ -45,22 +49,25 @@ func NewBlockedReadWriter(opts ...brwOpt) *blockedReadWriter {
 	return ret
 }
 
-func (rw *blockedReadWriter) Read(d []byte) (int, error) {
+func (rw *blockReadWriter) Read(d []byte) (int, error) {
 	total := 0
 	for {
 		var rn int = 0
 		var err error
 		if rw.r != nil {
-			rn, err = rw.r.Read(d)
-			total += rn
-			if errors.Is(err, io.EOF) {
-				if rw.pool != nil {
-					rw.pool.Put(rw.r)
+			for {
+				rn, err = rw.r.Read(d)
+				total += rn
+				if errors.Is(err, io.EOF) {
+					if rw.pool != nil {
+						rw.pool.Put(rw.r)
+					}
+					break
 				}
-			}
-
-			if rn == len(d) {
-				return total, nil
+				if err != nil || rn == len(d) {
+					return total, err
+				}
+				d = d[rn:]
 			}
 		}
 		r, ok := <-rw.ch
@@ -68,11 +75,10 @@ func (rw *blockedReadWriter) Read(d []byte) (int, error) {
 			return total, io.EOF
 		}
 		rw.r = r
-		d = d[rn:]
 	}
 }
 
-func (rw *blockedReadWriter) Write(d []byte) (int, error) {
+func (rw *blockReadWriter) Write(d []byte) (int, error) {
 	if len(d) == 0 {
 		return 0, nil
 	}
@@ -89,7 +95,7 @@ func (rw *blockedReadWriter) Write(d []byte) (int, error) {
 	return len(d), nil
 }
 
-func (rw *blockedReadWriter) Close() error {
+func (rw *blockReadWriter) Close() error {
 	select {
 	case <-rw.ch:
 		return nil
@@ -97,4 +103,20 @@ func (rw *blockedReadWriter) Close() error {
 		close(rw.ch)
 	}
 	return nil
+}
+
+type brwOpts struct{}
+
+var BlockRwOpts brwOpts
+
+func (o brwOpts) WithReaderFactory(rf ReaderFactory) brwOpt {
+	return func(writer *blockReadWriter) {
+		writer.rf = rf
+	}
+}
+
+func (o brwOpts) WithPool(p Pool) brwOpt {
+	return func(writer *blockReadWriter) {
+		writer.pool = p
+	}
 }
