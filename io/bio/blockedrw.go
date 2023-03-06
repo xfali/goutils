@@ -35,10 +35,11 @@ type Pool interface {
 }
 
 type blockReadWriter struct {
-	ch   chan io.Reader
-	r    io.Reader
-	rf   ReaderFactory
-	pool Pool
+	ch      chan io.Reader
+	closeCh chan struct{}
+	r       io.Reader
+	rf      ReaderFactory
+	pool    Pool
 
 	readTimeout  time.Duration
 	writeTimeout time.Duration
@@ -46,7 +47,8 @@ type blockReadWriter struct {
 
 func NewBlockReadWriter(opts ...brwOpt) *blockReadWriter {
 	ret := &blockReadWriter{
-		ch: make(chan io.Reader),
+		ch:      make(chan io.Reader),
+		closeCh: make(chan struct{}),
 	}
 	for _, opt := range opts {
 		opt(ret)
@@ -82,13 +84,30 @@ func (rw *blockReadWriter) Read(d []byte) (int, error) {
 		if rw.readTimeout > 0 {
 			ctx, _ := context.WithTimeout(context.Background(), rw.readTimeout)
 			select {
+			case <-rw.closeCh:
+				select {
+				case r, ok = <-rw.ch:
+					break
+				default:
+					return total, io.EOF
+				}
 			case <-ctx.Done():
 				return total, errors.New("Read timeout ")
 			case r, ok = <-rw.ch:
 				break
 			}
 		} else {
-			r, ok = <-rw.ch
+			select {
+			case <-rw.closeCh:
+				select {
+				case r, ok = <-rw.ch:
+					break
+				default:
+					return total, io.EOF
+				}
+			case r, ok = <-rw.ch:
+				break
+			}
 		}
 
 		if !ok {
@@ -125,23 +144,30 @@ func (rw *blockReadWriter) Write(d []byte) (int, error) {
 	if rw.writeTimeout > 0 {
 		ctx, _ := context.WithTimeout(context.Background(), rw.writeTimeout)
 		select {
+		case <-rw.closeCh:
+			return 0, errors.New("Closed ")
 		case <-ctx.Done():
 			return 0, errors.New("Write timeout ")
 		case rw.ch <- r:
 			break
 		}
 	} else {
-		rw.ch <- r
+		select {
+		case <-rw.closeCh:
+			return 0, errors.New("Closed ")
+		case rw.ch <- r:
+			break
+		}
 	}
 	return n, err
 }
 
 func (rw *blockReadWriter) Close() error {
 	select {
-	case <-rw.ch:
+	case <-rw.closeCh:
 		return nil
 	default:
-		close(rw.ch)
+		close(rw.closeCh)
 	}
 	return nil
 }
